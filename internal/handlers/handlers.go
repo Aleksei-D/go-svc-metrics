@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	metricTypePath    = "metricType"
-	metricNamePath    = "metricName"
-	metricValuePath   = "metricValue"
+	MetricTypePath    = "metricType"
+	MetricNamePath    = "metricName"
+	MetricValuePath   = "metricValue"
 	MetricHandlerPath = "POST /update/{metricType}/{metricName}/{metricValue}"
 )
 
@@ -19,9 +19,9 @@ type MetricHandler struct {
 }
 
 func (m *MetricHandler) Serve(res http.ResponseWriter, req *http.Request) {
-	metricType := req.PathValue(metricTypePath)
-	metricNameFromPath := req.PathValue(metricNamePath)
-	metricValueFromPath := req.PathValue(metricValuePath)
+	metricType := req.PathValue(MetricTypePath)
+	metricNameFromPath := req.PathValue(MetricNamePath)
+	metricValueFromPath := req.PathValue(MetricValuePath)
 	switch metricType {
 	case models.Counter:
 		metricValue, err := strconv.Atoi(metricValueFromPath)
