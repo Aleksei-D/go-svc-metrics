@@ -2,19 +2,16 @@ package main
 
 import (
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/handlers"
+	"go-svc-metrics/internal/server"
 	"go-svc-metrics/internal/storage"
 	"net/http"
 )
 
 func main() {
+	metricStorage := storage.InitMemStorage()
 	serveConfig := config.GetServeConfig()
-	memStorage := storage.InitMemStorage()
-	metricHandler := handlers.MetricHandler{Storage: memStorage}
-	mux := http.NewServeMux()
-	mux.HandleFunc(handlers.MetricHandlerPath, metricHandler.Serve)
-
-	err := http.ListenAndServe(serveConfig.GetServeAddress(), mux)
+	r := server.GetMetricRouter(metricStorage)
+	err := http.ListenAndServe(serveConfig.GetServeAddress(), r)
 	if err != nil {
 		panic(err)
 	}

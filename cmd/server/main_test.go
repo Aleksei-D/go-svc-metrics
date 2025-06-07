@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go-svc-metrics/internal/handlers"
+	"go-svc-metrics/internal/server"
 	"go-svc-metrics/internal/storage"
 	"io"
 	"net/http"
@@ -12,83 +11,68 @@ import (
 	"testing"
 )
 
-const pathTemplate = "/update/%s/%s/%s"
+func testRequest(t *testing.T, ts *httptest.Server, method,
+	path string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, nil)
+	require.NoError(t, err)
+
+	resp, err := ts.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
+}
 
 func TestStatusHandler(t *testing.T) {
-	type want struct {
-		code     int
-		response string
-	}
 	tests := []struct {
-		name        string
-		metricType  string
-		metricName  string
-		metricValue string
-		want        want
+		name   string
+		path   string
+		code   int
+		method string
 	}{
 		{
-			name:        "positive test for gauge metric #1",
-			metricType:  "gauge",
-			metricName:  "someMetric",
-			metricValue: "1.0",
-			want: want{
-				code: 200,
-			},
+			name:   "positive test for gauge metric #1",
+			path:   "/update/gauge/someMetric/1.0",
+			method: http.MethodPost,
+			code:   http.StatusOK,
 		},
 		{
-			name:        "Negative test for gauge metric - Invalid value #2",
-			metricType:  "gauge",
-			metricName:  "someMetric",
-			metricValue: "1.a",
-			want: want{
-				code: 400,
-			},
+			name:   "Negative test for gauge metric - Invalid value #2",
+			path:   "/update/gauge/someMetric/1.a",
+			code:   http.StatusBadRequest,
+			method: http.MethodPost,
 		},
 		{
-			name:        "positive test for counter metric #3",
-			metricType:  "counter",
-			metricName:  "someMetric",
-			metricValue: "1",
-			want: want{
-				code: 200,
-			},
+			name:   "positive test for counter metric #3",
+			path:   "/update/counter/someMetric/1",
+			code:   http.StatusOK,
+			method: http.MethodPost,
 		},
 		{
-			name:        "Negative test for counter metric - Invalid value #4",
-			metricType:  "counter",
-			metricName:  "someMetric",
-			metricValue: "xs2",
-			want: want{
-				code: 400,
-			},
+			name:   "Negative test for counter metric - Invalid value #4",
+			path:   "/update/counter/someMetric/xs2",
+			code:   http.StatusBadRequest,
+			method: http.MethodPost,
 		},
 		{
-			name:        "Negative test for invalid type metric #5",
-			metricType:  "creator",
-			metricName:  "someMetric",
-			metricValue: "xs2",
-			want: want{
-				code: 400,
-			},
+			name:   "Negative test for invalid type metric #5",
+			path:   "/update/creator/someMetric/xs2",
+			code:   http.StatusBadRequest,
+			method: http.MethodPost,
 		},
 	}
-	metricHandler := handlers.MetricHandler{Storage: storage.InitMemStorage()}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			path := fmt.Sprintf(pathTemplate, test.metricType, test.metricName, test.metricValue)
-			request := httptest.NewRequest(http.MethodPost, path, nil)
-			request.SetPathValue(handlers.MetricTypePath, test.metricType)
-			request.SetPathValue(handlers.MetricNamePath, test.metricName)
-			request.SetPathValue(handlers.MetricValuePath, test.metricValue)
+	memStorage := storage.InitMemStorage()
+	ts := httptest.NewServer(server.GetMetricRouter(memStorage))
+	defer ts.Close()
 
-			w := httptest.NewRecorder()
-			metricHandler.Serve(w, request)
-
-			res := w.Result()
-			assert.Equal(t, test.want.code, res.StatusCode)
-			defer res.Body.Close()
-			_, err := io.ReadAll(res.Body)
-			require.NoError(t, err)
+	for _, v := range tests {
+		t.Run(v.name, func(t *testing.T) {
+			resp, _ := testRequest(t, ts, v.method, v.path)
+			defer resp.Body.Close()
+			assert.Equal(t, v.code, resp.StatusCode)
 		})
 	}
 }
