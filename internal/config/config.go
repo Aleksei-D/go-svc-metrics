@@ -2,52 +2,70 @@ package config
 
 import (
 	"flag"
+	"github.com/caarlos0/env/v6"
+	"log"
 	"os"
 	"time"
 )
 
 func GetServerConfig() *Config {
+	var newConfig Config
+	err := env.Parse(&newConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
-	err := serverFlagSet.Parse(os.Args[1:])
+	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
-	return &Config{
-		serverAddr: *serverAddr,
+	if newConfig.ServerAddr == "" {
+		newConfig.ServerAddr = *serverAddr
 	}
+	return &newConfig
 }
 
 func GetAgentConfig() *Config {
+	var newConfig Config
+	err := env.Parse(&newConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 	agentFlagSet := flag.NewFlagSet("Agent", flag.ExitOnError)
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
 	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
-	pollInterval := agentFlagSet.Int64("p", pollInterval, "input pollInterval")
-	err := agentFlagSet.Parse(os.Args[1:])
+	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
+	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
-	return &Config{
-		serverAddr:     *serverAddr,
-		reportInterval: time.Duration(*reportInterval) * time.Second,
-		pollInterval:   time.Duration(*pollInterval) * time.Second,
+	if newConfig.ServerAddr == "" {
+		newConfig.ServerAddr = *serverAddr
 	}
+	if newConfig.ReportInterval == 0 {
+		newConfig.ReportInterval = *reportInterval
+	}
+	if newConfig.PollInterval == 0 {
+		newConfig.PollInterval = *pollInterval
+	}
+	return &newConfig
 }
 
 type Config struct {
-	serverAddr     string
-	reportInterval time.Duration
-	pollInterval   time.Duration
+	ServerAddr     string `env:"ADDRESS"`
+	ReportInterval int    `env:"REPORT_INTERVAL"`
+	PollInterval   int    `env:"POLL_INTERVAL"`
 }
 
 func (s Config) GetServeAddress() string {
-	return s.serverAddr
+	return s.ServerAddr
 }
 
 func (s Config) GetPollInterval() time.Duration {
-	return s.pollInterval
+	return time.Duration(s.PollInterval) * time.Second
 }
 
 func (s Config) GetReportInterval() time.Duration {
-	return s.reportInterval
+	return time.Duration(s.ReportInterval) * time.Second
 }
