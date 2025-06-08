@@ -21,16 +21,16 @@ func GetServerConfig() *Config {
 func GetAgentConfig() *Config {
 	agentFlagSet := flag.NewFlagSet("Agent", flag.ExitOnError)
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
-	reportInterval := agentFlagSet.Duration("r", reportInterval, "input reportInterval")
-	pollInterval := agentFlagSet.Duration("p", pollInterval, "input pollInterval")
+	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
+	pollInterval := agentFlagSet.Int64("p", pollInterval, "input pollInterval")
 	err := agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
 	return &Config{
 		serverAddr:     *serverAddr,
-		reportInterval: *reportInterval,
-		pollInterval:   *pollInterval,
+		reportInterval: time.Duration(*reportInterval) * time.Second,
+		pollInterval:   time.Duration(*pollInterval) * time.Second,
 	}
 }
 
