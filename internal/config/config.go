@@ -1,19 +1,53 @@
 package config
 
 import (
-	"fmt"
+	"flag"
+	"os"
+	"time"
 )
 
-func GetServeConfig() *ServeConfig {
-	return &ServeConfig{
-		port: serverPort,
+func GetServerConfig() *Config {
+	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
+	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
+	err := serverFlagSet.Parse(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+	return &Config{
+		serverAddr: *serverAddr,
 	}
 }
 
-type ServeConfig struct {
-	port string
+func GetAgentConfig() *Config {
+	agentFlagSet := flag.NewFlagSet("Agent", flag.ExitOnError)
+	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
+	reportInterval := agentFlagSet.Duration("r", reportInterval, "input reportInterval")
+	pollInterval := agentFlagSet.Duration("p", pollInterval, "input pollInterval")
+	err := agentFlagSet.Parse(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+	return &Config{
+		serverAddr:     *serverAddr,
+		reportInterval: *reportInterval,
+		pollInterval:   *pollInterval,
+	}
 }
 
-func (s ServeConfig) GetServeAddress() string {
-	return fmt.Sprintf(serverAddressTemplate, s.port)
+type Config struct {
+	serverAddr     string
+	reportInterval time.Duration
+	pollInterval   time.Duration
+}
+
+func (s Config) GetServeAddress() string {
+	return s.serverAddr
+}
+
+func (s Config) GetPollInterval() time.Duration {
+	return s.pollInterval
+}
+
+func (s Config) GetReportInterval() time.Duration {
+	return s.reportInterval
 }

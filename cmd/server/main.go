@@ -9,9 +9,9 @@ import (
 
 func main() {
 	metricStorage := storage.InitMemStorage()
-	serveConfig := config.GetServeConfig()
+	configServe := config.GetServerConfig()
 	r := server.GetMetricRouter(metricStorage)
-	err := http.ListenAndServe(serveConfig.GetServeAddress(), r)
+	err := http.ListenAndServe(configServe.GetServeAddress(), r)
 	if err != nil {
 		panic(err)
 	}

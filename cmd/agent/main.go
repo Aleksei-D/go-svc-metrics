@@ -3,5 +3,6 @@ package main
 import "go-svc-metrics/internal/agent"
 
 func main() {
-	agent.MetricProcessing()
+	app := agent.GetNewAgent()
+	app.MetricProcessing()
 }

@@ -1,6 +1,9 @@
 package config
 
+import "time"
+
 const (
-	serverPort            = "8080"
-	serverAddressTemplate = ":%s"
+	defaultServerAddr = "localhost:8080"
+	pollInterval      = 2 * time.Second
+	reportInterval    = 10 * time.Second
 )
