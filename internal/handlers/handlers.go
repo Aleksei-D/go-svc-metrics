@@ -32,14 +32,22 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 			http.Error(res, "invalid metric value", http.StatusBadRequest)
 			return
 		}
-		m.Storage.UpdateCounter(metricNameFromPath, int64(metricValue))
+		err = m.Storage.UpdateCounter(metricNameFromPath, int64(metricValue))
+		if err != nil {
+			http.Error(res, "invalid counter operation", http.StatusBadRequest)
+			return
+		}
 	case models.Gauge:
 		_, err := strconv.ParseFloat(metricValueFromPath, 64)
 		if err != nil {
 			http.Error(res, "invalid metric value", http.StatusBadRequest)
 			return
 		}
-		m.Storage.UpdateGauge(metricNameFromPath, metricValueFromPath)
+		err = m.Storage.UpdateGauge(metricNameFromPath, metricValueFromPath)
+		if err != nil {
+			http.Error(res, "invalid gauge operation", http.StatusBadRequest)
+			return
+		}
 	default:
 		http.Error(res, "invalid metric type", http.StatusBadRequest)
 		return

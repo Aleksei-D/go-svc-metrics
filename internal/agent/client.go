@@ -69,7 +69,6 @@ func (a *Agent) UpdateGaugeMetric() {
 	a.metrics["MCacheInuse"] = strconv.FormatUint(a.memStats.MCacheInuse, 10)
 	a.metrics["MCacheSys"] = strconv.FormatUint(a.memStats.MCacheSys, 10)
 	a.metrics["MSpanInuse"] = strconv.FormatUint(a.memStats.MSpanInuse, 10)
-	a.metrics["MCacheInuse"] = strconv.FormatUint(a.memStats.MCacheInuse, 10)
 	a.metrics["MSpanSys"] = strconv.FormatUint(a.memStats.MSpanSys, 10)
 	a.metrics["Mallocs"] = strconv.FormatUint(a.memStats.Mallocs, 10)
 	a.metrics["NextGC"] = strconv.FormatUint(a.memStats.NextGC, 10)

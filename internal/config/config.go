@@ -9,34 +9,26 @@ import (
 )
 
 func GetServerConfig() *Config {
-	var newConfig Config
-	err := env.Parse(&newConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+	newConfig := initConfig()
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
-	err = serverFlagSet.Parse(os.Args[1:])
+	err := serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
 	if newConfig.ServerAddr == "" {
 		newConfig.ServerAddr = *serverAddr
 	}
-	return &newConfig
+	return newConfig
 }
 
 func GetAgentConfig() *Config {
-	var newConfig Config
-	err := env.Parse(&newConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+	newConfig := initConfig()
 	agentFlagSet := flag.NewFlagSet("Agent", flag.ExitOnError)
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
 	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
 	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
-	err = agentFlagSet.Parse(os.Args[1:])
+	err := agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -48,6 +40,15 @@ func GetAgentConfig() *Config {
 	}
 	if newConfig.PollInterval == 0 {
 		newConfig.PollInterval = *pollInterval
+	}
+	return newConfig
+}
+
+func initConfig() *Config {
+	var newConfig Config
+	err := env.Parse(&newConfig)
+	if err != nil {
+		log.Fatal(err)
 	}
 	return &newConfig
 }

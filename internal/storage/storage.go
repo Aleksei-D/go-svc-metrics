@@ -11,8 +11,8 @@ type MemStorage struct {
 }
 
 type Repositories interface {
-	UpdateGauge(metricName, value string)
-	UpdateCounter(metricName string, delta int64)
+	UpdateGauge(metricName, value string) error
+	UpdateCounter(metricName string, delta int64) error
 	GetValue(metricName string) (string, bool)
 	GetAllMetrics() map[string]string
 }
@@ -23,22 +23,27 @@ func InitMemStorage() *MemStorage {
 	}
 }
 
-func (m *MemStorage) UpdateCounter(metricName string, delta int64) {
+func (m *MemStorage) UpdateCounter(metricName string, delta int64) error {
 	m.mutex.Lock()
 	value, ok := m.Metrics[metricName]
 	if !ok {
 		m.Metrics[metricName] = strconv.FormatInt(delta, 10)
 	} else {
-		valueInt, _ := strconv.ParseInt(value, 10, 64)
+		valueInt, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return err
+		}
 		m.Metrics[metricName] = strconv.FormatInt(delta+valueInt, 10)
 	}
 	m.mutex.Unlock()
+	return nil
 }
 
-func (m *MemStorage) UpdateGauge(metricName, value string) {
+func (m *MemStorage) UpdateGauge(metricName, value string) error {
 	m.mutex.Lock()
 	m.Metrics[metricName] = value
 	m.mutex.Unlock()
+	return nil
 }
 
 func (m *MemStorage) GetAllMetrics() map[string]string {
