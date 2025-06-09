@@ -35,25 +35,25 @@ func TestStatusHandler(t *testing.T) {
 	}{
 		{
 			name:   "positive test for gauge metric #1",
-			path:   "/update/gauge/someMetric/1.0",
+			path:   "/update/gauge/GaugeMetric/1.0",
 			method: http.MethodPost,
 			code:   http.StatusOK,
 		},
 		{
 			name:   "Negative test for gauge metric - Invalid value #2",
-			path:   "/update/gauge/someMetric/1.a",
+			path:   "/update/gauge/GaugeMetric/1.a",
 			code:   http.StatusBadRequest,
 			method: http.MethodPost,
 		},
 		{
 			name:   "positive test for counter metric #3",
-			path:   "/update/counter/someMetric/1",
+			path:   "/update/counter/CounterMetric/4",
 			code:   http.StatusOK,
 			method: http.MethodPost,
 		},
 		{
 			name:   "Negative test for counter metric - Invalid value #4",
-			path:   "/update/counter/someMetric/xs2",
+			path:   "/update/counter/CounterMetric/xs2",
 			code:   http.StatusBadRequest,
 			method: http.MethodPost,
 		},
