@@ -37,6 +37,7 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 			http.Error(res, "invalid counter operation", http.StatusBadRequest)
 			return
 		}
+		res.WriteHeader(http.StatusOK)
 	case models.Gauge:
 		_, err := strconv.ParseFloat(metricValueFromPath, 64)
 		if err != nil {
@@ -48,6 +49,7 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 			http.Error(res, "invalid gauge operation", http.StatusBadRequest)
 			return
 		}
+		res.WriteHeader(http.StatusOK)
 	default:
 		http.Error(res, "invalid metric type", http.StatusBadRequest)
 		return

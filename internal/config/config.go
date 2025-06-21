@@ -12,12 +12,16 @@ func GetServerConfig() *Config {
 	newConfig := initConfig()
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
+	logLevel := serverFlagSet.String("l", logLevelDefault, "log level")
 	err := serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
 	if newConfig.ServerAddr == "" {
 		newConfig.ServerAddr = *serverAddr
+	}
+	if newConfig.LogLevel == "" {
+		newConfig.LogLevel = *logLevel
 	}
 	return newConfig
 }
@@ -57,6 +61,7 @@ type Config struct {
 	ServerAddr     string `env:"ADDRESS"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
+	LogLevel       string `env:"LOG_LEVEL"`
 }
 
 func (s Config) GetServeAddress() string {
