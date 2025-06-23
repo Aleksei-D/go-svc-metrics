@@ -11,8 +11,14 @@ func GetMetricRouter(storage storage.Repositories) chi.Router {
 	metricHandler := handlers.MetricHandler{Storage: storage}
 	r := chi.NewRouter()
 	r.Use(logger.LoggingMiddleware)
-	r.Post(handlers.UpdateMetricHandlerPath, metricHandler.UpdateMetric)
-	r.Get(handlers.GetMetricHandlerPath, metricHandler.GetMetricByName)
 	r.Get("/", metricHandler.GetMetrics)
+	r.Route("/update", func(r chi.Router) {
+		r.Post("/{metricType}/{metricName}/{metricValue}", metricHandler.UpdateMetric)
+		r.Post("/", metricHandler.V2UpdateMetric)
+	})
+	r.Route("/value", func(r chi.Router) {
+		r.Get("/{metricType}/{metricName}", metricHandler.GetMetricValue)
+		r.Post("/", metricHandler.GetMetric)
+	})
 	return r
 }

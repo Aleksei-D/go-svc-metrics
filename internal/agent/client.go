@@ -2,88 +2,93 @@ package agent
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/models"
+	"math/rand"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 )
 
-const pathTemplate = "http://%s/update/%s/%s/%s"
+const (
+	updatePath = "http://%s/update/"
+)
 
 type Agent struct {
-	metrics  map[string]string
-	memStats runtime.MemStats
+	metrics   map[string]float64
+	memStats  runtime.MemStats
+	PoolCount int64
 	*config.Config
 }
 
 func (a *Agent) SendReport() {
-	for metricName, metricValue := range a.metrics {
-		switch metricName {
-		case "PollCount":
-			go func() {
-				err := a.SendMetric(models.Counter, metricName, metricValue)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}()
-		default:
-			go func() {
-				err := a.SendMetric(models.Gauge, metricName, metricValue)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}()
+	for id, metricValue := range a.metrics {
+		metric := &models.Metrics{
+			ID:    id,
+			MType: models.Gauge,
+			Value: &metricValue,
 		}
+		go func() {
+			err := a.SendMetric(metric)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}()
 	}
-}
-
-func (a *Agent) UpdateCounterMetric() {
-	value, ok := a.metrics["PollCount"]
-	if !ok {
-		a.metrics["PollCount"] = "1"
-	} else {
-		valueInt, _ := strconv.ParseInt(value, 10, 64)
-		a.metrics["PollCount"] = strconv.FormatInt(valueInt+1, 10)
-	}
+	go func() {
+		err := a.SendMetric(&models.Metrics{
+			ID:    "PollCount",
+			MType: models.Counter,
+			Delta: &a.PoolCount,
+		})
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}()
 }
 
 func (a *Agent) UpdateGaugeMetric() {
-	a.metrics["Alloc"] = strconv.FormatUint(a.memStats.Alloc, 10)
-	a.metrics["BuckHashSys"] = strconv.FormatUint(a.memStats.BuckHashSys, 10)
-	a.metrics["Frees"] = strconv.FormatUint(a.memStats.Frees, 10)
-	a.metrics["GCCPUFraction"] = strconv.FormatFloat(a.memStats.GCCPUFraction, 'f', -1, 64)
-	a.metrics["GCSys"] = strconv.FormatUint(a.memStats.GCSys, 10)
-	a.metrics["HeapAlloc"] = strconv.FormatUint(a.memStats.HeapAlloc, 10)
-	a.metrics["HeapIdle"] = strconv.FormatUint(a.memStats.HeapIdle, 10)
-	a.metrics["HeapInuse"] = strconv.FormatUint(a.memStats.HeapInuse, 10)
-	a.metrics["HeapObjects"] = strconv.FormatUint(a.memStats.HeapObjects, 10)
-	a.metrics["HeapReleased"] = strconv.FormatUint(a.memStats.HeapReleased, 10)
-	a.metrics["HeapSys"] = strconv.FormatUint(a.memStats.HeapSys, 10)
-	a.metrics["LastGC"] = strconv.FormatUint(a.memStats.LastGC, 10)
-	a.metrics["Lookups"] = strconv.FormatUint(a.memStats.Lookups, 10)
-	a.metrics["MCacheInuse"] = strconv.FormatUint(a.memStats.MCacheInuse, 10)
-	a.metrics["MCacheSys"] = strconv.FormatUint(a.memStats.MCacheSys, 10)
-	a.metrics["MSpanInuse"] = strconv.FormatUint(a.memStats.MSpanInuse, 10)
-	a.metrics["MSpanSys"] = strconv.FormatUint(a.memStats.MSpanSys, 10)
-	a.metrics["Mallocs"] = strconv.FormatUint(a.memStats.Mallocs, 10)
-	a.metrics["NextGC"] = strconv.FormatUint(a.memStats.NextGC, 10)
-	a.metrics["NumGC"] = strconv.Itoa(int(a.memStats.NumGC))
-	a.metrics["NumForcedGC"] = strconv.Itoa(int(a.memStats.NumForcedGC))
-	a.metrics["OtherSys"] = strconv.FormatUint(a.memStats.OtherSys, 10)
-	a.metrics["PauseTotalNs"] = strconv.FormatUint(a.memStats.PauseTotalNs, 10)
-	a.metrics["StackInuse"] = strconv.FormatUint(a.memStats.StackInuse, 10)
-	a.metrics["StackSys"] = strconv.FormatUint(a.memStats.StackSys, 10)
-	a.metrics["Sys"] = strconv.FormatUint(a.memStats.Sys, 10)
-	a.metrics["TotalAlloc"] = strconv.FormatUint(a.memStats.TotalAlloc, 10)
+	a.metrics["Alloc"] = float64(a.memStats.Alloc)
+	a.metrics["BuckHashSys"] = float64(a.memStats.BuckHashSys)
+	a.metrics["Frees"] = float64(a.memStats.Frees)
+	a.metrics["GCCPUFraction"] = a.memStats.GCCPUFraction
+	a.metrics["GCSys"] = float64(a.memStats.GCSys)
+	a.metrics["HeapAlloc"] = float64(a.memStats.HeapAlloc)
+	a.metrics["HeapIdle"] = float64(a.memStats.HeapIdle)
+	a.metrics["HeapInuse"] = float64(a.memStats.HeapInuse)
+	a.metrics["HeapObjects"] = float64(a.memStats.HeapObjects)
+	a.metrics["HeapReleased"] = float64(a.memStats.HeapReleased)
+	a.metrics["HeapSys"] = float64(a.memStats.HeapSys)
+	a.metrics["LastGC"] = float64(a.memStats.LastGC)
+	a.metrics["Lookups"] = float64(a.memStats.Lookups)
+	a.metrics["MCacheInuse"] = float64(a.memStats.MCacheInuse)
+	a.metrics["MCacheSys"] = float64(a.memStats.MCacheSys)
+	a.metrics["MSpanInuse"] = float64(a.memStats.MSpanInuse)
+	a.metrics["MSpanSys"] = float64(a.memStats.MSpanSys)
+	a.metrics["Mallocs"] = float64(a.memStats.Mallocs)
+	a.metrics["NextGC"] = float64(a.memStats.NextGC)
+	a.metrics["NumGC"] = float64(a.memStats.NumGC)
+	a.metrics["NumForcedGC"] = float64(a.memStats.NumForcedGC)
+	a.metrics["OtherSys"] = float64(a.memStats.OtherSys)
+	a.metrics["PauseTotalNs"] = float64(a.memStats.PauseTotalNs)
+	a.metrics["StackInuse"] = float64(a.memStats.StackInuse)
+	a.metrics["StackSys"] = float64(a.memStats.StackSys)
+	a.metrics["Sys"] = float64(a.memStats.Sys)
+	a.metrics["TotalAlloc"] = float64(a.memStats.TotalAlloc)
+	a.metrics["RandomValue"] = rand.Float64()
 }
 
-func (a *Agent) SendMetric(metricType, metricName, value string) error {
-	response, err := http.Post(fmt.Sprintf(pathTemplate, a.GetServeAddress(), metricType, metricName, value), "text/plain", bytes.NewBuffer([]byte{}))
+func (a *Agent) SendMetric(metric *models.Metrics) error {
+	metricJSON, err := json.Marshal(metric)
+	if err != nil {
+		return err
+	}
+
+	response, err := http.Post(fmt.Sprintf(updatePath, a.GetServeAddress()), "application/json", bytes.NewBuffer(metricJSON))
 	if err != nil {
 		return err
 	}
@@ -94,7 +99,7 @@ func (a *Agent) SendMetric(metricType, metricName, value string) error {
 func GetNewAgent() *Agent {
 	agentConfig := config.GetAgentConfig()
 	return &Agent{
-		metrics: make(map[string]string),
+		metrics: make(map[string]float64),
 		Config:  agentConfig,
 	}
 }
@@ -107,7 +112,7 @@ func (a *Agent) MetricProcessing() {
 		case <-metricsPollTicker.C:
 			runtime.ReadMemStats(&a.memStats)
 			a.UpdateGaugeMetric()
-			a.UpdateCounterMetric()
+			a.PoolCount++
 		case <-metricReportTicker.C:
 			a.SendReport()
 		}
