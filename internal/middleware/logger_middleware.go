@@ -1,6 +1,7 @@
-package logger
+package middleware
 
 import (
+	"go-svc-metrics/internal/logger"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -37,7 +38,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(lw, r)
 		duration := time.Since(start)
-		Log.Info("REQUEST", zap.String("METHOD", r.Method), zap.String("URI", r.URL.String()), zap.Duration("DURATION", duration))
-		Log.Info("RESPONSE", zap.Int("STATUS", responseData.status), zap.Int("SIZE", responseData.size))
+		logger.Log.Info("REQUEST", zap.String("METHOD", r.Method), zap.String("URI", r.URL.String()), zap.Duration("DURATION", duration))
+		logger.Log.Info("RESPONSE", zap.Int("STATUS", responseData.status), zap.Int("SIZE", responseData.size))
 	})
 }

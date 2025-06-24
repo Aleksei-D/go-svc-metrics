@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go-svc-metrics/internal/storage"
 	"go-svc-metrics/models"
+	"io"
 	"net/http"
 	"strconv"
 )
@@ -101,22 +102,21 @@ func (m *MetricHandler) GetMetrics(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "invalid marshaling", http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	res.Header().Set("Content-Type", "text/html")
 	res.WriteHeader(http.StatusOK)
 	res.Write(jsonString)
 }
 
 func (m *MetricHandler) V2UpdateMetric(res http.ResponseWriter, req *http.Request) {
 	var metric models.Metrics
-	var buf bytes.Buffer
 
-	_, err := buf.ReadFrom(req.Body)
+	buf, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err = json.Unmarshal(buf.Bytes(), &metric); err != nil {
+	if err = json.Unmarshal(buf, &metric); err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}

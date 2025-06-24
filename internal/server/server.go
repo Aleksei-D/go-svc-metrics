@@ -3,14 +3,14 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	"go-svc-metrics/internal/handlers"
-	"go-svc-metrics/internal/logger"
+	"go-svc-metrics/internal/middleware"
 	"go-svc-metrics/internal/storage"
 )
 
 func GetMetricRouter(storage storage.Repositories) chi.Router {
 	metricHandler := handlers.MetricHandler{Storage: storage}
 	r := chi.NewRouter()
-	r.Use(logger.LoggingMiddleware)
+	r.Use(middleware.CompressMiddleware, middleware.LoggingMiddleware)
 	r.Get("/", metricHandler.GetMetrics)
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/{metricType}/{metricName}/{metricValue}", metricHandler.UpdateMetric)
