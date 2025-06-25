@@ -1,8 +1,14 @@
 package main
 
-import "go-svc-metrics/internal/agent"
+import (
+	"go-svc-metrics/internal/agent"
+	"go-svc-metrics/internal/logger"
+)
 
 func main() {
-	app := agent.GetNewMetricUpdater()
+	app, err := agent.GetNewMetricUpdater()
+	if err != nil {
+		logger.Log.Fatal(err.Error())
+	}
 	app.MetricProcessing()
 }

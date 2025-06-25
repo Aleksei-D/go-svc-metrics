@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -19,31 +20,41 @@ type MetricUpdater struct {
 }
 
 func (m *MetricUpdater) SendReport() {
+	var wg sync.WaitGroup
+	workerPoolSize := 10
+
+	dataCh := make(chan *models.Metrics, workerPoolSize)
+	for i := 0; i < workerPoolSize; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for metric := range dataCh {
+				err := m.clientAgent.SendMetric(metric)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			}
+		}()
+	}
+
 	for id, metricValue := range m.metrics {
 		metric := &models.Metrics{
 			ID:    id,
 			MType: models.Gauge,
 			Value: &metricValue,
 		}
-		go func() {
-			err := m.clientAgent.SendMetric(metric)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}()
+
+		dataCh <- metric
 	}
-	go func() {
-		err := m.clientAgent.SendMetric(&models.Metrics{
-			ID:    "PollCount",
-			MType: models.Counter,
-			Delta: &m.PoolCount,
-		})
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}()
+	dataCh <- &models.Metrics{
+		ID:    "PollCount",
+		MType: models.Counter,
+		Delta: &m.PoolCount,
+	}
+
+	close(dataCh)
+	wg.Wait()
 }
 
 func (m *MetricUpdater) UpdateGaugeMetric() {
@@ -80,6 +91,8 @@ func (m *MetricUpdater) UpdateGaugeMetric() {
 func (m *MetricUpdater) MetricProcessing() {
 	metricsPollTicker := time.NewTicker(m.GetPollInterval())
 	metricReportTicker := time.NewTicker(m.GetReportInterval())
+	defer metricsPollTicker.Stop()
+	defer metricReportTicker.Stop()
 	for {
 		select {
 		case <-metricsPollTicker.C:
@@ -92,8 +105,12 @@ func (m *MetricUpdater) MetricProcessing() {
 	}
 }
 
-func GetNewMetricUpdater() *MetricUpdater {
-	agentConfig := config.GetAgentConfig()
+func GetNewMetricUpdater() (*MetricUpdater, error) {
+	agentConfig, err := config.GetAgentConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	agentClient := ClientAgent{
 		updatePath: fmt.Sprintf(updatePath, agentConfig.GetServeAddress()),
 		httpClient: &http.Client{},
@@ -102,5 +119,5 @@ func GetNewMetricUpdater() *MetricUpdater {
 		metrics:     make(map[string]float64),
 		clientAgent: agentClient,
 		Config:      agentConfig,
-	}
+	}, nil
 }
