@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"go-svc-metrics/models"
 	"os"
@@ -54,13 +55,15 @@ func (p *Producer) DumpMetrics() error {
 	return nil
 }
 
-func (p *Producer) DumpMetricsByInterval() error {
+func (p *Producer) DumpMetricsByInterval(ctx context.Context) error {
 	storeIntervalTicker := time.NewTicker(p.storeInterval)
 	defer storeIntervalTicker.Stop()
-	for range storeIntervalTicker.C {
+	select {
+	case <-storeIntervalTicker.C:
+		return p.DumpMetrics()
+	case <-ctx.Done():
 		return p.DumpMetrics()
 	}
-	return nil
 }
 
 type Consumer struct {

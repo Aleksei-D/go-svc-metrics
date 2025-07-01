@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
-	"sync"
 	"time"
 )
 
@@ -20,41 +19,31 @@ type MetricUpdater struct {
 }
 
 func (m *MetricUpdater) SendReport() {
-	var wg sync.WaitGroup
-	workerPoolSize := 10
-
-	dataCh := make(chan *models.Metrics, workerPoolSize)
-	for i := 0; i < workerPoolSize; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for metric := range dataCh {
-				err := m.clientAgent.SendMetric(metric)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-		}()
-	}
-
 	for id, metricValue := range m.metrics {
 		metric := &models.Metrics{
 			ID:    id,
 			MType: models.Gauge,
 			Value: &metricValue,
 		}
-
-		dataCh <- metric
+		go func() {
+			err := m.clientAgent.SendMetric(metric)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}()
 	}
-	dataCh <- &models.Metrics{
-		ID:    "PollCount",
-		MType: models.Counter,
-		Delta: &m.PoolCount,
-	}
-
-	close(dataCh)
-	wg.Wait()
+	go func() {
+		err := m.clientAgent.SendMetric(&models.Metrics{
+			ID:    "PollCount",
+			MType: models.Counter,
+			Delta: &m.PoolCount,
+		})
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}()
 }
 
 func (m *MetricUpdater) UpdateGaugeMetric() {
