@@ -3,8 +3,9 @@ package main
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/server"
-	"go-svc-metrics/internal/storage"
+	"go-svc-metrics/internal/storage/local"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -64,7 +65,11 @@ func TestStatusHandler(t *testing.T) {
 			method: http.MethodPost,
 		},
 	}
-	memStorage := storage.InitMemStorage()
+
+	_ = config.InitDefaultEnv()
+	configServe, _ := config.InitConfig()
+	memStorage, _ := local.NewLocalStorage(configServe)
+	defer memStorage.Close()
 	ts := httptest.NewServer(server.GetMetricRouter(memStorage))
 	defer ts.Close()
 

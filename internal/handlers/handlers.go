@@ -95,7 +95,7 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 	}
 }
 
-func (m *MetricHandler) GetMetrics(res http.ResponseWriter, req *http.Request) {
+func (m *MetricHandler) GetMetrics(res http.ResponseWriter, _ *http.Request) {
 	metrics := m.Storage.GetAllMetrics()
 	jsonString, err := json.Marshal(metrics)
 	if err != nil {
@@ -166,4 +166,12 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(jsonData)
+}
+
+func (m *MetricHandler) GetPing(res http.ResponseWriter, _ *http.Request) {
+	if ok := m.Storage.Ping(); !ok {
+		http.Error(res, "Not connect to DB", http.StatusInternalServerError)
+		return
+	}
+	res.WriteHeader(http.StatusOK)
 }
