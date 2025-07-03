@@ -57,8 +57,8 @@ func (l *Storage) UpdateMetric(metricToUpdate models.Metrics) (models.Metrics, e
 	return metricToUpdate, nil
 }
 
-func (l *Storage) GetAllMetrics() map[string]models.Metrics {
-	return l.Metrics
+func (l *Storage) GetAllMetrics() (map[string]models.Metrics, error) {
+	return l.Metrics, nil
 }
 
 func (l *Storage) GetValue(metric models.Metrics) (models.Metrics, bool) {

@@ -96,7 +96,12 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 }
 
 func (m *MetricHandler) GetMetrics(res http.ResponseWriter, _ *http.Request) {
-	metrics := m.Storage.GetAllMetrics()
+	metrics, err := m.Storage.GetAllMetrics()
+	if err != nil {
+		http.Error(res, "invalid marshaling", http.StatusInternalServerError)
+		return
+	}
+
 	jsonString, err := json.Marshal(metrics)
 	if err != nil {
 		http.Error(res, "invalid marshaling", http.StatusInternalServerError)

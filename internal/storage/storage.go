@@ -15,7 +15,7 @@ import (
 type Repositories interface {
 	UpdateMetric(metric models.Metrics) (models.Metrics, error)
 	GetValue(metric models.Metrics) (models.Metrics, bool)
-	GetAllMetrics() map[string]models.Metrics
+	GetAllMetrics() (map[string]models.Metrics, error)
 	Ping() bool
 	Close() error
 	DumpMetricsByInterval(ctx context.Context) error
