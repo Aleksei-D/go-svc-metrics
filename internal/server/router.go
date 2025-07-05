@@ -21,5 +21,8 @@ func GetMetricRouter(storage storage.Repositories) chi.Router {
 		r.Get("/{metricType}/{metricName}", metricHandler.GetMetricValue)
 		r.Post("/", metricHandler.GetMetric)
 	})
+	r.Route("/updates", func(r chi.Router) {
+		r.Post("/", metricHandler.UpdateBatchMetrics)
+	})
 	return r
 }

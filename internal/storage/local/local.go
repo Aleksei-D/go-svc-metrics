@@ -39,26 +39,32 @@ func NewLocalStorage(config *config.Config) (*Storage, error) {
 	return &localStorage, nil
 }
 
-func (l *Storage) UpdateMetric(metricToUpdate models.Metrics) (models.Metrics, error) {
-	l.mutex.Lock()
-	switch metricToUpdate.MType {
-	case models.Gauge:
-		l.Metrics[metricToUpdate.ID] = metricToUpdate
-	case models.Counter:
-		_, ok := l.Metrics[metricToUpdate.ID]
-		if !ok {
+func (l *Storage) UpdateMetrics(metricsToUpdate []models.Metrics) ([]models.Metrics, error) {
+	for _, metricToUpdate := range metricsToUpdate {
+		l.mutex.Lock()
+		switch metricToUpdate.MType {
+		case models.Gauge:
 			l.Metrics[metricToUpdate.ID] = metricToUpdate
-		} else {
-			*l.Metrics[metricToUpdate.ID].Delta += *metricToUpdate.Delta
+		case models.Counter:
+			_, ok := l.Metrics[metricToUpdate.ID]
+			if !ok {
+				l.Metrics[metricToUpdate.ID] = metricToUpdate
+			} else {
+				*l.Metrics[metricToUpdate.ID].Delta += *metricToUpdate.Delta
+			}
+			metricToUpdate.Delta = l.Metrics[metricToUpdate.ID].Delta
 		}
-		metricToUpdate.Delta = l.Metrics[metricToUpdate.ID].Delta
+		l.mutex.Unlock()
 	}
-	l.mutex.Unlock()
-	return metricToUpdate, nil
+	return metricsToUpdate, nil
 }
 
-func (l *Storage) GetAllMetrics() (map[string]models.Metrics, error) {
-	return l.Metrics, nil
+func (l *Storage) GetAllMetrics() ([]models.Metrics, error) {
+	metrics := make([]models.Metrics, 0)
+	for _, metric := range l.Metrics {
+		metrics = append(metrics, metric)
+	}
+	return metrics, nil
 }
 
 func (l *Storage) GetValue(metric models.Metrics) (models.Metrics, bool) {
