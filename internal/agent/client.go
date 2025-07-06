@@ -6,14 +6,41 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
+	"go-svc-metrics/internal/utils"
 	"go-svc-metrics/models"
 	"net/http"
+	"time"
 )
 
 const (
 	updatePath              = "http://%s/update/"
 	updatesBatchMetricsPath = "http://%s/updates/"
 )
+
+type retryRoundTripper struct {
+	next       http.RoundTripper
+	maxRetries uint
+}
+
+func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	var res *http.Response
+	var err error
+	delay := utils.GetDelay()
+	for attempts := 0; attempts < int(rr.maxRetries); attempts++ {
+		res, err = rr.next.RoundTrip(r)
+		if err == nil && res.StatusCode < http.StatusInternalServerError {
+			break
+		}
+
+		select {
+		case <-r.Context().Done():
+			return res, r.Context().Err()
+		case <-time.After(delay()):
+		}
+	}
+
+	return res, err
+}
 
 type ClientAgent struct {
 	httpClient *http.Client
@@ -61,7 +88,7 @@ func (c *ClientAgent) sendMetric(metricData []byte, updatePath string) (*http.Re
 		return nil, err
 	}
 
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "text/html")
 	request.Header.Set("Content-Encoding", "gzip")
 	request.Header.Set("Accept-Encoding", "gzip")
 	return c.httpClient.Do(request)

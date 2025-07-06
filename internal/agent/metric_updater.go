@@ -130,8 +130,13 @@ func GetNewMetricUpdater() (*MetricUpdater, error) {
 	}
 
 	agentClient := ClientAgent{
-		config:     agentConfig,
-		httpClient: &http.Client{},
+		config: agentConfig,
+		httpClient: &http.Client{
+			Transport: &retryRoundTripper{
+				maxRetries: 3,
+				next:       http.DefaultTransport,
+			},
+		},
 	}
 	return &MetricUpdater{
 		metrics:     make(map[string]models.Metrics),

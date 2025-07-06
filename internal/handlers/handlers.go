@@ -72,12 +72,12 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	metric, ok := m.Storage.GetValue(models.Metrics{
+	metric, err := m.Storage.GetValue(models.Metrics{
 		ID:    metricNameFromPath,
 		MType: metricTypeFromPath,
 	})
-	if !ok {
-		http.Error(res, "invalid metric type", http.StatusNotFound)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusNotFound)
 		return
 	}
 	switch metric.MType {
@@ -88,7 +88,7 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 	}
 
 	res.WriteHeader(http.StatusOK)
-	_, err := res.Write([]byte(value))
+	_, err = res.Write([]byte(value))
 	if err != nil {
 		http.Error(res, "invalid value", http.StatusBadRequest)
 		return
@@ -157,9 +157,9 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	metric, ok := m.Storage.GetValue(metricReq)
-	if !ok {
-		http.Error(res, "invalid counter operation", http.StatusNotFound)
+	metric, err := m.Storage.GetValue(metricReq)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -174,8 +174,9 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 }
 
 func (m *MetricHandler) GetPing(res http.ResponseWriter, _ *http.Request) {
-	if ok := m.Storage.Ping(); !ok {
-		http.Error(res, "Not connect to DB", http.StatusInternalServerError)
+	err := m.Storage.Ping()
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	res.WriteHeader(http.StatusOK)

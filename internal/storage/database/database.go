@@ -18,11 +18,8 @@ func NewDatabaseStorage(db *sql.DB) (*Storage, error) {
 	return &Storage{db}, nil
 }
 
-func (d *Storage) Ping() bool {
-	if err := d.DB.Ping(); err != nil {
-		return false
-	}
-	return true
+func (d *Storage) Ping() error {
+	return d.DB.Ping()
 }
 
 func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
@@ -31,8 +28,8 @@ func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, err
 		return metrics, err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO metric_table as t1 (name_id, delta, value) VALUES ($1, $2, $3) " +
-		"ON CONFLICT (name_id) DO UPDATE SET delta = t1.delta + EXCLUDED.delta, value = $3 RETURNING delta, value")
+	stmt, err := tx.Prepare("INSERT INTO metric_table as t1 (name_id, type, delta, value) VALUES ($1, $2, $3, $4) " +
+		"ON CONFLICT (name_id) DO UPDATE SET delta = t1.delta + EXCLUDED.delta, value = $4 RETURNING delta, value")
 	if err != nil {
 		return metrics, err
 	}
@@ -41,7 +38,7 @@ func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, err
 		var delta sql.NullInt64
 		var value sql.NullFloat64
 
-		row := stmt.QueryRow(metric.ID, metric.Delta, metric.Value)
+		row := stmt.QueryRow(metric.ID, metric.MType, metric.Delta, metric.Value)
 		err = row.Scan(&delta, &value)
 		if err != nil {
 			return metrics, err
@@ -61,13 +58,13 @@ func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, err
 	return metrics, nil
 }
 
-func (d *Storage) GetValue(metric models.Metrics) (models.Metrics, bool) {
+func (d *Storage) GetValue(metric models.Metrics) (models.Metrics, error) {
 	var delta sql.NullInt64
 	var value sql.NullFloat64
-	row := d.DB.QueryRow("SELECT delta, value FROM metric_table WHERE name_id = $1", metric.ID)
+	row := d.DB.QueryRow("SELECT delta, value FROM metric_table WHERE name_id = $1 and type = $2", metric.ID, metric.MType)
 	err := row.Scan(&delta, &value)
 	if err != nil {
-		return metric, false
+		return metric, err
 	}
 
 	if delta.Valid {
@@ -76,12 +73,12 @@ func (d *Storage) GetValue(metric models.Metrics) (models.Metrics, bool) {
 	if value.Valid {
 		metric.Value = &value.Float64
 	}
-	return metric, true
+	return metric, nil
 }
 
 func (d *Storage) GetAllMetrics() ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
-	rows, err := d.DB.Query("SELECT name_id, delta, value FROM metric_table")
+	rows, err := d.DB.Query("SELECT name_id, type, delta, value FROM metric_table")
 	if err != nil {
 		return metrics, err
 	}
@@ -91,8 +88,16 @@ func (d *Storage) GetAllMetrics() ([]models.Metrics, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var delta sql.NullInt64
+		var value sql.NullFloat64
 		var metric models.Metrics
-		err := rows.Scan(&metric.ID, &metric.Delta, &metric.Value)
+		err := rows.Scan(&metric.ID, &metric.MType, &delta, &value)
+		if delta.Valid {
+			metric.Delta = &delta.Int64
+		}
+		if value.Valid {
+			metric.Value = &value.Float64
+		}
 		if err != nil {
 			return metrics, err
 		}

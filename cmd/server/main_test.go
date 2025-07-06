@@ -68,7 +68,7 @@ func TestStatusHandler(t *testing.T) {
 
 	_ = config.InitDefaultEnv()
 	configServe, _ := config.InitConfig()
-	memStorage, _ := local.NewLocalStorage(configServe)
+	memStorage, _ := local.NewRetryWrapperLocalStorage(configServe, 3)
 	defer memStorage.Close()
 	ts := httptest.NewServer(server.GetMetricRouter(memStorage))
 	defer ts.Close()

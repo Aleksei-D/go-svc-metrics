@@ -14,20 +14,22 @@ import (
 
 type Repositories interface {
 	UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error)
-	GetValue(metric models.Metrics) (models.Metrics, bool)
+	GetValue(metric models.Metrics) (models.Metrics, error)
 	GetAllMetrics() ([]models.Metrics, error)
-	Ping() bool
+	Ping() error
 	Close() error
 	DumpMetricsByInterval(ctx context.Context) error
 }
+
+const attemptsDefault uint = 3
 
 func InitRepositories(config *config.Config) (Repositories, error) {
 	db, err := getDBConnect(*config.DatabaseDsn)
 	if err != nil {
 		logger.Log.Info(err.Error())
-		return local.NewLocalStorage(config)
+		return local.NewRetryWrapperLocalStorage(config, attemptsDefault)
 	}
-	return database.NewDatabaseStorage(db)
+	return database.NewRetryWrapperStorage(db, attemptsDefault)
 }
 
 func getDBConnect(databaseDsn string) (*sql.DB, error) {

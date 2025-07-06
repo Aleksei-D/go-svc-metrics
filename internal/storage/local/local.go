@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/models"
 	"os"
@@ -67,13 +69,16 @@ func (l *Storage) GetAllMetrics() ([]models.Metrics, error) {
 	return metrics, nil
 }
 
-func (l *Storage) GetValue(metric models.Metrics) (models.Metrics, bool) {
+func (l *Storage) GetValue(metric models.Metrics) (models.Metrics, error) {
 	value, ok := l.Metrics[metric.ID]
-	return value, ok
+	if !ok {
+		return models.Metrics{}, errors.New("metric not found")
+	}
+	return value, nil
 }
 
-func (l *Storage) Ping() bool {
-	return false
+func (l *Storage) Ping() error {
+	return fmt.Errorf("DB not initialized")
 }
 
 func (l *Storage) Close() error {
