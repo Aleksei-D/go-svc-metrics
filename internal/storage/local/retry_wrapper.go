@@ -9,30 +9,30 @@ import (
 	"time"
 )
 
-type RetryWrapperLocalStorage struct {
-	*Storage
+type RetryWrapperMetricLocalRepository struct {
+	*MetricLocalRepository
 	retryErrors error
 	attempts    uint
 }
 
-func NewRetryWrapperLocalStorage(config *config.Config, attempts uint) (*RetryWrapperLocalStorage, error) {
-	storage, err := NewLocalStorage(config)
+func NewRetryWrapperLocalStorage(config *config.Config, attempts uint) (*RetryWrapperMetricLocalRepository, error) {
+	storage, err := NewMetricLocalRepository(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RetryWrapperLocalStorage{
-		Storage:     storage,
-		attempts:    attempts,
-		retryErrors: errors.Join([]error{os.ErrDeadlineExceeded, os.ErrNoDeadline, os.ErrInvalid}...),
+	return &RetryWrapperMetricLocalRepository{
+		MetricLocalRepository: storage,
+		attempts:              attempts,
+		retryErrors:           errors.Join([]error{os.ErrDeadlineExceeded, os.ErrNoDeadline, os.ErrInvalid}...),
 	}, nil
 }
 
-func (r *RetryWrapperLocalStorage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
+func (r *RetryWrapperMetricLocalRepository) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		upsertMetrics, err := r.Storage.UpdateMetrics(metrics)
+		upsertMetrics, err := r.MetricLocalRepository.UpdateMetrics(metrics)
 		resultMetrics = append(resultMetrics, upsertMetrics...)
 		if errors.Is(err, r.retryErrors) {
 			time.Sleep(delay())
@@ -47,11 +47,11 @@ func (r *RetryWrapperLocalStorage) UpdateMetrics(metrics []models.Metrics) ([]mo
 	return resultMetrics, nil
 }
 
-func (r *RetryWrapperLocalStorage) GetValue(metric models.Metrics) (models.Metrics, error) {
+func (r *RetryWrapperMetricLocalRepository) GetMetric(metric models.Metrics) (models.Metrics, error) {
 	var resultMetric models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		fetchMetric, err := r.Storage.GetValue(metric)
+		fetchMetric, err := r.MetricLocalRepository.GetMetric(metric)
 		resultMetric = fetchMetric
 		if errors.Is(err, r.retryErrors) {
 			time.Sleep(delay())
@@ -66,11 +66,11 @@ func (r *RetryWrapperLocalStorage) GetValue(metric models.Metrics) (models.Metri
 	return resultMetric, nil
 }
 
-func (r *RetryWrapperLocalStorage) GetAllMetrics() ([]models.Metrics, error) {
+func (r *RetryWrapperMetricLocalRepository) GetAllMetrics() ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		fetchMetrics, err := r.Storage.GetAllMetrics()
+		fetchMetrics, err := r.MetricLocalRepository.GetAllMetrics()
 		resultMetrics = append(resultMetrics, fetchMetrics...)
 		if errors.Is(err, r.retryErrors) {
 			time.Sleep(delay())
@@ -83,21 +83,4 @@ func (r *RetryWrapperLocalStorage) GetAllMetrics() ([]models.Metrics, error) {
 		return resultMetrics, nil
 	}
 	return resultMetrics, nil
-}
-
-func (r *RetryWrapperLocalStorage) Ping() error {
-	delay := utils.GetDelay()
-	for i := 0; i <= int(r.attempts); i++ {
-		err := r.Storage.Ping()
-		if errors.Is(err, r.retryErrors) {
-			time.Sleep(delay())
-			continue
-		}
-
-		if err != nil {
-			return err
-		}
-		return err
-	}
-	return nil
 }

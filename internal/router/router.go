@@ -1,14 +1,17 @@
-package server
+package router
 
 import (
 	"github.com/go-chi/chi/v5"
 	"go-svc-metrics/internal/handlers"
 	"go-svc-metrics/internal/middleware"
 	"go-svc-metrics/internal/storage"
+	"go-svc-metrics/internal/usecase"
 )
 
-func GetMetricRouter(storage storage.Repositories) chi.Router {
-	metricHandler := handlers.MetricHandler{Storage: storage}
+func GetMetricRouter(metricRepository storage.MetricRepository) chi.Router {
+	metricUseCase := usecase.NewMetricUseCase(metricRepository)
+	metricHandler := handlers.MetricHandler{MetricUseCase: metricUseCase}
+
 	r := chi.NewRouter()
 	r.Use(middleware.CompressMiddleware, middleware.LoggingMiddleware)
 	r.Get("/", metricHandler.GetMetrics)

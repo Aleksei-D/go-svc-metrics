@@ -8,28 +8,25 @@ import (
 	"time"
 )
 
-type RetryWrapperStorage struct {
-	*Storage
-	attempts uint
-}
-
-func NewRetryWrapperStorage(db *sql.DB, attempts uint) (*RetryWrapperStorage, error) {
-	storage, err := NewDatabaseStorage(db)
+func NewRetryMetricRepository(db *sql.DB, attempts uint) (*RetryMetricRepository, error) {
+	metricRepository, err := NewMetricRepository(db)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RetryWrapperStorage{
-		Storage:  storage,
-		attempts: attempts,
-	}, nil
+	return &RetryMetricRepository{MetricDatabaseRepository: metricRepository, attempts: attempts}, nil
 }
 
-func (r *RetryWrapperStorage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
+type RetryMetricRepository struct {
+	*MetricDatabaseRepository
+	attempts uint
+}
+
+func (r *RetryMetricRepository) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		upsertMetrics, err := r.Storage.UpdateMetrics(metrics)
+		upsertMetrics, err := r.MetricDatabaseRepository.UpdateMetrics(metrics)
 		resultMetrics = append(resultMetrics, upsertMetrics...)
 		if err != nil {
 			if pgerrcode.IsConnectionException(err.Error()) || pgerrcode.IsIntegrityConstraintViolation(err.Error()) {
@@ -43,11 +40,11 @@ func (r *RetryWrapperStorage) UpdateMetrics(metrics []models.Metrics) ([]models.
 	return resultMetrics, nil
 }
 
-func (r *RetryWrapperStorage) GetValue(metric models.Metrics) (models.Metrics, error) {
+func (r *RetryMetricRepository) GetValue(metric models.Metrics) (models.Metrics, error) {
 	var resultMetric models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		fetchMetric, err := r.Storage.GetValue(metric)
+		fetchMetric, err := r.MetricDatabaseRepository.GetMetric(metric)
 		resultMetric = fetchMetric
 		if err != nil {
 			if pgerrcode.IsConnectionException(err.Error()) || pgerrcode.IsIntegrityConstraintViolation(err.Error()) {
@@ -61,11 +58,11 @@ func (r *RetryWrapperStorage) GetValue(metric models.Metrics) (models.Metrics, e
 	return resultMetric, nil
 }
 
-func (r *RetryWrapperStorage) GetAllMetrics() ([]models.Metrics, error) {
+func (r *RetryMetricRepository) GetAllMetrics() ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		fetchMetrics, err := r.Storage.GetAllMetrics()
+		fetchMetrics, err := r.MetricDatabaseRepository.GetAllMetrics()
 		resultMetrics = append(resultMetrics, fetchMetrics...)
 		if err != nil {
 			if pgerrcode.IsConnectionException(err.Error()) || pgerrcode.IsIntegrityConstraintViolation(err.Error()) {
@@ -79,10 +76,10 @@ func (r *RetryWrapperStorage) GetAllMetrics() ([]models.Metrics, error) {
 	return resultMetrics, nil
 }
 
-func (r *RetryWrapperStorage) Ping() error {
+func (r *RetryMetricRepository) Ping() error {
 	delay := utils.GetDelay()
 	for i := 0; i <= int(r.attempts); i++ {
-		err := r.Storage.Ping()
+		err := r.MetricDatabaseRepository.Ping()
 		if err != nil {
 			if pgerrcode.IsConnectionException(err.Error()) {
 				time.Sleep(delay())

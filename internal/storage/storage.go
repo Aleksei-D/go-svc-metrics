@@ -12,24 +12,24 @@ import (
 	"go-svc-metrics/models"
 )
 
-type Repositories interface {
+const attemptsDefault uint = 3
+
+type MetricRepository interface {
 	UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error)
-	GetValue(metric models.Metrics) (models.Metrics, error)
+	GetMetric(metric models.Metrics) (models.Metrics, error)
 	GetAllMetrics() ([]models.Metrics, error)
 	Ping() error
 	Close() error
 	DumpMetricsByInterval(ctx context.Context) error
 }
 
-const attemptsDefault uint = 3
-
-func InitRepositories(config *config.Config) (Repositories, error) {
+func NewMetricRepository(config *config.Config) (MetricRepository, error) {
 	db, err := getDBConnect(*config.DatabaseDsn)
 	if err != nil {
 		logger.Log.Info(err.Error())
 		return local.NewRetryWrapperLocalStorage(config, attemptsDefault)
 	}
-	return database.NewRetryWrapperStorage(db, attemptsDefault)
+	return database.NewRetryMetricRepository(db, attemptsDefault)
 }
 
 func getDBConnect(databaseDsn string) (*sql.DB, error) {

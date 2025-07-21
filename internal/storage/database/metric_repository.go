@@ -6,30 +6,36 @@ import (
 	"go-svc-metrics/models"
 )
 
-type Storage struct {
-	*sql.DB
+type MetricDatabaseRepository struct {
+	db *sql.DB
 }
 
-func NewDatabaseStorage(db *sql.DB) (*Storage, error) {
+func NewMetricRepository(db *sql.DB) (*MetricDatabaseRepository, error) {
 	_, err := db.Exec(CreateTableSQL)
 	if err != nil {
 		return nil, err
 	}
-	return &Storage{db}, nil
+	return &MetricDatabaseRepository{db: db}, nil
 }
 
-func (d *Storage) Ping() error {
-	return d.DB.Ping()
+func (m *MetricDatabaseRepository) Ping() error {
+	return m.db.Ping()
 }
 
-func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
-	tx, err := d.DB.Begin()
+func (m *MetricDatabaseRepository) Close() error { return m.db.Close() }
+
+func (m *MetricDatabaseRepository) DumpMetricsByInterval(_ context.Context) error {
+	return nil
+}
+
+func (m *MetricDatabaseRepository) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
+	tx, err := m.db.Begin()
 	if err != nil {
 		return metrics, err
 	}
-
-	stmt, err := tx.Prepare("INSERT INTO metric_table as t1 (name_id, type, delta, value) VALUES ($1, $2, $3, $4) " +
-		"ON CONFLICT (name_id) DO UPDATE SET delta = t1.delta + EXCLUDED.delta, value = $4 RETURNING delta, value")
+	query := `INSERT INTO metric_table as t1 (name_id, type, delta, value) VALUES ($1, $2, $3, $4) 
+    ON CONFLICT (name_id) DO UPDATE SET delta = t1.delta + EXCLUDED.delta, value = $4 RETURNING delta, value`
+	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return metrics, err
 	}
@@ -58,10 +64,11 @@ func (d *Storage) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, err
 	return metrics, nil
 }
 
-func (d *Storage) GetValue(metric models.Metrics) (models.Metrics, error) {
+func (m *MetricDatabaseRepository) GetMetric(metric models.Metrics) (models.Metrics, error) {
 	var delta sql.NullInt64
 	var value sql.NullFloat64
-	row := d.DB.QueryRow("SELECT delta, value FROM metric_table WHERE name_id = $1 and type = $2", metric.ID, metric.MType)
+	query := `SELECT delta, value FROM metric_table WHERE name_id = $1 and type = $2`
+	row := m.db.QueryRow(query, metric.ID, metric.MType)
 	err := row.Scan(&delta, &value)
 	if err != nil {
 		return metric, err
@@ -76,9 +83,9 @@ func (d *Storage) GetValue(metric models.Metrics) (models.Metrics, error) {
 	return metric, nil
 }
 
-func (d *Storage) GetAllMetrics() ([]models.Metrics, error) {
+func (m *MetricDatabaseRepository) GetAllMetrics() ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
-	rows, err := d.DB.Query("SELECT name_id, type, delta, value FROM metric_table")
+	rows, err := m.db.Query("SELECT name_id, type, delta, value FROM metric_table")
 	if err != nil {
 		return metrics, err
 	}
@@ -104,10 +111,4 @@ func (d *Storage) GetAllMetrics() ([]models.Metrics, error) {
 		metrics = append(metrics, metric)
 	}
 	return metrics, nil
-}
-
-func (d *Storage) Close() error { return d.DB.Close() }
-
-func (d *Storage) DumpMetricsByInterval(_ context.Context) error {
-	return nil
 }

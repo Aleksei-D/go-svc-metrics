@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
-	"go-svc-metrics/internal/storage"
+	"go-svc-metrics/internal/usecase"
 	"go-svc-metrics/models"
 	"io"
 	"net/http"
@@ -18,7 +18,7 @@ const (
 )
 
 type MetricHandler struct {
-	Storage storage.Repositories
+	MetricUseCase *usecase.MetricUseCase
 }
 
 func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request) {
@@ -38,7 +38,7 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 		}
 		value := int64(metricValue)
 		metric.Delta = &value
-		_, err = m.Storage.UpdateMetrics([]models.Metrics{metric})
+		_, err = m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
 		if err != nil {
 			http.Error(res, "invalid counter operation", http.StatusBadRequest)
 			return
@@ -51,7 +51,7 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 			return
 		}
 		metric.Value = &metricValue
-		_, err = m.Storage.UpdateMetrics([]models.Metrics{metric})
+		_, err = m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
 		if err != nil {
 			http.Error(res, "invalid gauge operation", http.StatusBadRequest)
 			return
@@ -72,7 +72,7 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	metric, err := m.Storage.GetValue(models.Metrics{
+	metric, err := m.MetricUseCase.GetMetric(models.Metrics{
 		ID:    metricNameFromPath,
 		MType: metricTypeFromPath,
 	})
@@ -96,9 +96,9 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 }
 
 func (m *MetricHandler) GetMetrics(res http.ResponseWriter, _ *http.Request) {
-	metrics, err := m.Storage.GetAllMetrics()
+	metrics, err := m.MetricUseCase.GetAllMetrics()
 	if err != nil {
-		http.Error(res, "invalid marshaling", http.StatusInternalServerError)
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -126,9 +126,9 @@ func (m *MetricHandler) V2UpdateMetric(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	updatedMetrics, err := m.Storage.UpdateMetrics([]models.Metrics{metric})
+	updatedMetrics, err := m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
 	if err != nil {
-		http.Error(res, "invalid counter operation", http.StatusBadRequest)
+		http.Error(res, "invalid counter operation", http.StatusInternalServerError)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	metric, err := m.Storage.GetValue(metricReq)
+	metric, err := m.MetricUseCase.GetMetric(metricReq)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusNotFound)
 		return
@@ -171,15 +171,6 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(jsonData)
-}
-
-func (m *MetricHandler) GetPing(res http.ResponseWriter, _ *http.Request) {
-	err := m.Storage.Ping()
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	res.WriteHeader(http.StatusOK)
 }
 
 func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Request) {
@@ -196,7 +187,7 @@ func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Re
 		return
 	}
 
-	updatedMetrics, err := m.Storage.UpdateMetrics(metrics)
+	updatedMetrics, err := m.MetricUseCase.UpdateMetrics(metrics)
 	if err != nil {
 		http.Error(res, "invalid counter operation", http.StatusBadRequest)
 		return
@@ -210,4 +201,13 @@ func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Re
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(jsonData)
+}
+
+func (m *MetricHandler) GetPing(res http.ResponseWriter, _ *http.Request) {
+	err := m.MetricUseCase.Ping()
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res.WriteHeader(http.StatusOK)
 }

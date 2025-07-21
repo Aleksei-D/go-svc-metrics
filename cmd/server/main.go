@@ -5,7 +5,7 @@ import (
 	"errors"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/logger"
-	chiRouter "go-svc-metrics/internal/server"
+	chiRouter "go-svc-metrics/internal/router"
 	"go-svc-metrics/internal/storage"
 	"log"
 	"net/http"
@@ -26,12 +26,12 @@ func main() {
 		logger.Log.Fatal("cannot initialize zap")
 	}
 
-	metricStorage, err := storage.InitRepositories(configServe)
+	metricStorage, err := storage.NewMetricRepository(configServe)
 	if err != nil {
 		logger.Log.Fatal(err.Error())
 	}
 
-	defer func(metricStorage storage.Repositories) {
+	defer func(metricStorage storage.MetricRepository) {
 		err := metricStorage.Close()
 		if err != nil {
 			logger.Log.Fatal(err.Error())
@@ -39,7 +39,6 @@ func main() {
 	}(metricStorage)
 
 	r := chiRouter.GetMetricRouter(metricStorage)
-
 	server := &http.Server{Addr: configServe.GetServeAddress(), Handler: r}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
