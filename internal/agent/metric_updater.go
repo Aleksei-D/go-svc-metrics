@@ -10,71 +10,100 @@ import (
 	"time"
 )
 
+const counterMetricName = "PollCount"
+
 type MetricUpdater struct {
-	metrics     map[string]float64
+	metrics     map[string]models.Metrics
 	memStats    runtime.MemStats
-	PoolCount   int64
 	clientAgent ClientAgent
 	*config.Config
 }
 
 func (m *MetricUpdater) SendReport() {
-	for id, metricValue := range m.metrics {
-		metric := &models.Metrics{
-			ID:    id,
-			MType: models.Gauge,
-			Value: &metricValue,
-		}
+	for _, metric := range m.metrics {
 		go func() {
-			err := m.clientAgent.SendMetric(metric)
+			err := m.clientAgent.SendOneMetric(metric)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
 		}()
 	}
-	go func() {
-		err := m.clientAgent.SendMetric(&models.Metrics{
-			ID:    "PollCount",
-			MType: models.Counter,
-			Delta: &m.PoolCount,
-		})
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}()
 }
 
-func (m *MetricUpdater) UpdateGaugeMetric() {
-	m.metrics["Alloc"] = float64(m.memStats.Alloc)
-	m.metrics["BuckHashSys"] = float64(m.memStats.BuckHashSys)
-	m.metrics["Frees"] = float64(m.memStats.Frees)
-	m.metrics["GCCPUFraction"] = m.memStats.GCCPUFraction
-	m.metrics["GCSys"] = float64(m.memStats.GCSys)
-	m.metrics["HeapAlloc"] = float64(m.memStats.HeapAlloc)
-	m.metrics["HeapIdle"] = float64(m.memStats.HeapIdle)
-	m.metrics["HeapInuse"] = float64(m.memStats.HeapInuse)
-	m.metrics["HeapObjects"] = float64(m.memStats.HeapObjects)
-	m.metrics["HeapReleased"] = float64(m.memStats.HeapReleased)
-	m.metrics["HeapSys"] = float64(m.memStats.HeapSys)
-	m.metrics["LastGC"] = float64(m.memStats.LastGC)
-	m.metrics["Lookups"] = float64(m.memStats.Lookups)
-	m.metrics["MCacheInuse"] = float64(m.memStats.MCacheInuse)
-	m.metrics["MCacheSys"] = float64(m.memStats.MCacheSys)
-	m.metrics["MSpanInuse"] = float64(m.memStats.MSpanInuse)
-	m.metrics["MSpanSys"] = float64(m.memStats.MSpanSys)
-	m.metrics["Mallocs"] = float64(m.memStats.Mallocs)
-	m.metrics["NextGC"] = float64(m.memStats.NextGC)
-	m.metrics["NumGC"] = float64(m.memStats.NumGC)
-	m.metrics["NumForcedGC"] = float64(m.memStats.NumForcedGC)
-	m.metrics["OtherSys"] = float64(m.memStats.OtherSys)
-	m.metrics["PauseTotalNs"] = float64(m.memStats.PauseTotalNs)
-	m.metrics["StackInuse"] = float64(m.memStats.StackInuse)
-	m.metrics["StackSys"] = float64(m.memStats.StackSys)
-	m.metrics["Sys"] = float64(m.memStats.Sys)
-	m.metrics["TotalAlloc"] = float64(m.memStats.TotalAlloc)
-	m.metrics["RandomValue"] = rand.Float64()
+func (m *MetricUpdater) SendAllReports() {
+	if len(m.metrics) == 0 {
+		return
+	}
+
+	metricsToSend := make([]models.Metrics, 0)
+	for _, metric := range m.metrics {
+		metricsToSend = append(metricsToSend, metric)
+	}
+	err := m.clientAgent.SendBatchMetrics(metricsToSend)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+}
+
+func (m *MetricUpdater) UpdateMetricFromStats() {
+	m.updateGaugeMetric("Alloc", float64(m.memStats.Alloc))
+	m.updateGaugeMetric("BuckHashSys", float64(m.memStats.BuckHashSys))
+	m.updateGaugeMetric("Frees", float64(m.memStats.Frees))
+	m.updateGaugeMetric("GCCPUFraction", m.memStats.GCCPUFraction)
+	m.updateGaugeMetric("GCSys", float64(m.memStats.GCSys))
+	m.updateGaugeMetric("HeapAlloc", float64(m.memStats.HeapAlloc))
+	m.updateGaugeMetric("HeapIdle", float64(m.memStats.HeapIdle))
+	m.updateGaugeMetric("HeapInuse", float64(m.memStats.HeapInuse))
+	m.updateGaugeMetric("HeapObjects", float64(m.memStats.HeapObjects))
+	m.updateGaugeMetric("HeapReleased", float64(m.memStats.HeapReleased))
+	m.updateGaugeMetric("HeapSys", float64(m.memStats.HeapSys))
+	m.updateGaugeMetric("LastGC", float64(m.memStats.LastGC))
+	m.updateGaugeMetric("Lookups", float64(m.memStats.Lookups))
+	m.updateGaugeMetric("MCacheInuse", float64(m.memStats.MCacheInuse))
+	m.updateGaugeMetric("MCacheSys", float64(m.memStats.MCacheSys))
+	m.updateGaugeMetric("MSpanInuse", float64(m.memStats.MSpanInuse))
+	m.updateGaugeMetric("MSpanSys", float64(m.memStats.MSpanSys))
+	m.updateGaugeMetric("Mallocs", float64(m.memStats.Mallocs))
+	m.updateGaugeMetric("NextGC", float64(m.memStats.NextGC))
+	m.updateGaugeMetric("NumGC", float64(m.memStats.NumGC))
+	m.updateGaugeMetric("NumForcedGC", float64(m.memStats.NumForcedGC))
+	m.updateGaugeMetric("OtherSys", float64(m.memStats.OtherSys))
+	m.updateGaugeMetric("PauseTotalNs", float64(m.memStats.PauseTotalNs))
+	m.updateGaugeMetric("StackInuse", float64(m.memStats.StackInuse))
+	m.updateGaugeMetric("StackSys", float64(m.memStats.StackSys))
+	m.updateGaugeMetric("Sys", float64(m.memStats.Sys))
+	m.updateGaugeMetric("TotalAlloc", float64(m.memStats.TotalAlloc))
+	m.updateGaugeMetric("RandomValue", rand.Float64())
+}
+
+func (m *MetricUpdater) updateGaugeMetric(nameID string, value float64) {
+	metric, ok := m.metrics[nameID]
+	switch ok {
+	case true:
+		*metric.Value = value
+	case false:
+		m.metrics[nameID] = models.Metrics{
+			ID:    nameID,
+			MType: models.Gauge,
+			Value: &value,
+		}
+	}
+}
+
+func (m *MetricUpdater) updateCounterMetric() {
+	metric, ok := m.metrics[counterMetricName]
+	switch ok {
+	case true:
+		*metric.Delta++
+	case false:
+		m.metrics[counterMetricName] = models.Metrics{
+			ID:    counterMetricName,
+			MType: models.Counter,
+			Delta: new(int64),
+		}
+	}
 }
 
 func (m *MetricUpdater) MetricProcessing() {
@@ -86,10 +115,10 @@ func (m *MetricUpdater) MetricProcessing() {
 		select {
 		case <-metricsPollTicker.C:
 			runtime.ReadMemStats(&m.memStats)
-			m.UpdateGaugeMetric()
-			m.PoolCount++
+			m.UpdateMetricFromStats()
+			m.updateCounterMetric()
 		case <-metricReportTicker.C:
-			m.SendReport()
+			m.SendAllReports()
 		}
 	}
 }
@@ -101,11 +130,16 @@ func GetNewMetricUpdater() (*MetricUpdater, error) {
 	}
 
 	agentClient := ClientAgent{
-		updatePath: fmt.Sprintf(updatePath, agentConfig.GetServeAddress()),
-		httpClient: &http.Client{},
+		config: agentConfig,
+		httpClient: &http.Client{
+			Transport: &retryRoundTripper{
+				maxRetries: 3,
+				next:       http.DefaultTransport,
+			},
+		},
 	}
 	return &MetricUpdater{
-		metrics:     make(map[string]float64),
+		metrics:     make(map[string]models.Metrics),
 		clientAgent: agentClient,
 		Config:      agentConfig,
 	}, nil

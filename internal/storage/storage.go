@@ -1,50 +1,48 @@
 package storage
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	_ "github.com/lib/pq"
+	"go-svc-metrics/internal/config"
+	"go-svc-metrics/internal/logger"
+	"go-svc-metrics/internal/storage/database"
+	"go-svc-metrics/internal/storage/local"
 	"go-svc-metrics/models"
-	"sync"
 )
 
-type MemStorage struct {
-	Metrics map[string]models.Metrics
-	mutex   sync.Mutex
+const attemptsDefault uint = 3
+
+type MetricRepository interface {
+	UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error)
+	GetMetric(metric models.Metrics) (models.Metrics, error)
+	GetAllMetrics() ([]models.Metrics, error)
+	Ping() error
+	Close() error
+	DumpMetricsByInterval(ctx context.Context) error
 }
 
-type Repositories interface {
-	UpdateMetric(metric models.Metrics) (models.Metrics, error)
-	GetValue(metric models.Metrics) (models.Metrics, bool)
-	GetAllMetrics() map[string]models.Metrics
-}
-
-func InitMemStorage() *MemStorage {
-	return &MemStorage{
-		Metrics: make(map[string]models.Metrics),
+func NewMetricRepository(config *config.Config) (MetricRepository, error) {
+	db, err := getDBConnect(*config.DatabaseDsn)
+	if err != nil {
+		logger.Log.Info(err.Error())
+		return local.NewRetryWrapperLocalStorage(config, attemptsDefault)
 	}
+	return database.NewRetryMetricRepository(db, attemptsDefault)
 }
 
-func (m *MemStorage) UpdateMetric(metricToUpdate models.Metrics) (models.Metrics, error) {
-	m.mutex.Lock()
-	switch metricToUpdate.MType {
-	case models.Gauge:
-		m.Metrics[metricToUpdate.ID] = metricToUpdate
-	case models.Counter:
-		_, ok := m.Metrics[metricToUpdate.ID]
-		if !ok {
-			m.Metrics[metricToUpdate.ID] = metricToUpdate
-		} else {
-			*m.Metrics[metricToUpdate.ID].Delta += *metricToUpdate.Delta
+func getDBConnect(databaseDsn string) (*sql.DB, error) {
+	if databaseDsn != "" {
+		db, err := sql.Open("postgres", databaseDsn)
+		if err != nil {
+			return nil, err
 		}
-		metricToUpdate.Delta = m.Metrics[metricToUpdate.ID].Delta
+
+		if err := db.Ping(); err != nil {
+			return nil, err
+		}
+		return db, nil
 	}
-	m.mutex.Unlock()
-	return metricToUpdate, nil
-}
-
-func (m *MemStorage) GetAllMetrics() map[string]models.Metrics {
-	return m.Metrics
-}
-
-func (m *MemStorage) GetValue(metric models.Metrics) (models.Metrics, bool) {
-	value, ok := m.Metrics[metric.ID]
-	return value, ok
+	return nil, fmt.Errorf("database connection is empty")
 }

@@ -4,11 +4,12 @@ import (
 	"flag"
 	"github.com/caarlos0/env/v6"
 	"os"
+	"strconv"
 	"time"
 )
 
 func GetServerConfig() (*Config, error) {
-	newConfig, err := initConfig()
+	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -19,6 +20,7 @@ func GetServerConfig() (*Config, error) {
 	storeInterval := serverFlagSet.Int("i", StoreIntervalDefault, "store interval")
 	fileStoragePath := serverFlagSet.String("f", FileStoragePathDefault, "file storage path")
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
+	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -38,11 +40,14 @@ func GetServerConfig() (*Config, error) {
 	if newConfig.Restore == nil {
 		newConfig.Restore = restore
 	}
+	if newConfig.DatabaseDsn == nil {
+		newConfig.DatabaseDsn = databaseDsn
+	}
 	return newConfig, nil
 }
 
 func GetAgentConfig() (*Config, error) {
-	newConfig, err := initConfig()
+	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +72,7 @@ func GetAgentConfig() (*Config, error) {
 	return newConfig, nil
 }
 
-func initConfig() (*Config, error) {
+func InitConfig() (*Config, error) {
 	var newConfig Config
 	err := env.Parse(&newConfig)
 	if err != nil {
@@ -84,6 +89,7 @@ type Config struct {
 	StoreInterval   *int    `env:"STORE_INTERVAL"`
 	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool   `env:"RESTORE"`
+	DatabaseDsn     *string `env:"DATABASE_DSN"`
 }
 
 func (s Config) GetServeAddress() string {
@@ -100,4 +106,21 @@ func (s Config) GetReportInterval() time.Duration {
 
 func (s Config) GetStoreInterval() time.Duration {
 	return time.Duration(*s.StoreInterval) * time.Second
+}
+
+func InitDefaultEnv() error {
+	envDefaults := map[string]string{
+		"ADDRESS":           defaultServerAddr,
+		"LOG_LEVEL":         logLevelDefault,
+		"STORE_INTERVAL":    strconv.Itoa(StoreIntervalDefault),
+		"FILE_STORAGE_PATH": FileStoragePathDefault,
+		"RESTORE":           "false",
+	}
+	for k, v := range envDefaults {
+		err := os.Setenv(k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
