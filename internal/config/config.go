@@ -21,6 +21,7 @@ func GetServerConfig() (*Config, error) {
 	fileStoragePath := serverFlagSet.String("f", FileStoragePathDefault, "file storage path")
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
 	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
+	key := serverFlagSet.String("k", secretKeyDefault, "sha key")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -43,6 +44,9 @@ func GetServerConfig() (*Config, error) {
 	if newConfig.DatabaseDsn == nil {
 		newConfig.DatabaseDsn = databaseDsn
 	}
+	if newConfig.Key == nil {
+		newConfig.Key = key
+	}
 	return newConfig, nil
 }
 
@@ -56,6 +60,7 @@ func GetAgentConfig() (*Config, error) {
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
 	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
 	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
+	key := agentFlagSet.String("k", secretKeyDefault, "sha key")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
@@ -68,6 +73,9 @@ func GetAgentConfig() (*Config, error) {
 	}
 	if newConfig.PollInterval == nil {
 		newConfig.PollInterval = pollInterval
+	}
+	if newConfig.Key == nil {
+		newConfig.Key = key
 	}
 	return newConfig, nil
 }
@@ -90,6 +98,7 @@ type Config struct {
 	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool   `env:"RESTORE"`
 	DatabaseDsn     *string `env:"DATABASE_DSN"`
+	Key             *string `env:"KEY"`
 }
 
 func (s Config) GetServeAddress() string {

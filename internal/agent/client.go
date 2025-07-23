@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
@@ -83,7 +84,7 @@ func (c *ClientAgent) sendMetric(metricData []byte, updatePath string) (*http.Re
 		return nil, err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, updatePath, bytes.NewBuffer(gzipData))
+	request, err := c.getRequest(updatePath, gzipData)
 	if err != nil {
 		return nil, err
 	}
@@ -114,4 +115,22 @@ func Compress(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (c *ClientAgent) getRequest(url string, data []byte) (*http.Request, error) {
+	if c.config.Key != nil {
+		hash := utils.GetHash(*c.config.Key, data)
+		cryptData, err := utils.EncryptData(*c.config.Key, data)
+		if err != nil {
+			return nil, err
+		}
+
+		request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(cryptData))
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set("HashSHA256", hex.EncodeToString(hash))
+		return request, nil
+	}
+	return http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 }

@@ -38,7 +38,7 @@ func main() {
 		}
 	}(metricStorage)
 
-	r := chiRouter.GetMetricRouter(metricStorage)
+	r := chiRouter.GetMetricRouter(metricStorage, configServe)
 	server := &http.Server{Addr: configServe.GetServeAddress(), Handler: r}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 

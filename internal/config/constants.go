@@ -8,4 +8,5 @@ const (
 	StoreIntervalDefault   = 300
 	FileStoragePathDefault = "metrics.dump"
 	restoreDefault         = false
+	secretKeyDefault       = "SecretKey"
 )
