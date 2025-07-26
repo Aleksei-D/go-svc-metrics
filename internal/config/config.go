@@ -16,7 +16,7 @@ func GetServerConfig() (*Config, error) {
 
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
-	logLevel := serverFlagSet.String("l", logLevelDefault, "log level")
+	logLevel := serverFlagSet.String("w", logLevelDefault, "log level")
 	storeInterval := serverFlagSet.Int("i", StoreIntervalDefault, "store interval")
 	fileStoragePath := serverFlagSet.String("f", FileStoragePathDefault, "file storage path")
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
@@ -61,6 +61,7 @@ func GetAgentConfig() (*Config, error) {
 	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
 	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
 	key := agentFlagSet.String("k", secretKeyDefault, "sha key")
+	rateLimit := agentFlagSet.Uint("l", defaultRateLimit, "rate limit")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
@@ -76,6 +77,9 @@ func GetAgentConfig() (*Config, error) {
 	}
 	if newConfig.Key == nil {
 		newConfig.Key = key
+	}
+	if newConfig.RateLimit == nil {
+		newConfig.RateLimit = rateLimit
 	}
 	return newConfig, nil
 }
@@ -99,6 +103,7 @@ type Config struct {
 	Restore         *bool   `env:"RESTORE"`
 	DatabaseDsn     *string `env:"DATABASE_DSN"`
 	Key             *string `env:"KEY"`
+	RateLimit       *uint   `env:"RATE_LIMIT"`
 }
 
 func (s Config) GetServeAddress() string {

@@ -9,4 +9,5 @@ const (
 	FileStoragePathDefault = "metrics.dump"
 	restoreDefault         = false
 	secretKeyDefault       = "SecretKey"
+	defaultRateLimit       = 3
 )

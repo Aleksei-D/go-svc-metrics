@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
+	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/internal/utils"
 	"go-svc-metrics/models"
 	"net/http"
@@ -46,6 +47,18 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
+}
+
+func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan []models.Metrics) {
+	select {
+	case <-doneCh:
+		return
+	case metrics := <-metricCh:
+		err := c.SendBatchMetrics(metrics)
+		if err != nil {
+			logger.Log.Warn(err.Error())
+		}
+	}
 }
 
 func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {

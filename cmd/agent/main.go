@@ -6,9 +6,13 @@ import (
 )
 
 func main() {
-	app, err := agent.GetNewMetricUpdater()
+	metricAgent, err := agent.NewMetricUpdater()
 	if err != nil {
 		logger.Log.Fatal(err.Error())
 	}
-	app.MetricProcessing()
+
+	err = metricAgent.Run()
+	if err != nil {
+		logger.Log.Fatal(err.Error())
+	}
 }
