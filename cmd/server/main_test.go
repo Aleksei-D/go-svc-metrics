@@ -72,7 +72,7 @@ func TestStatusHandler(t *testing.T) {
 	memStorage, _ := local.NewRetryWrapperLocalStorage(configServe, 3)
 	metricUseCase := usecase.NewMetricUseCase(memStorage)
 	defer memStorage.Close()
-	ts := httptest.NewServer(router.GetMetricRouter(metricUseCase))
+	ts := httptest.NewServer(router.NewMetricRouter(metricUseCase, configServe))
 	defer ts.Close()
 
 	for _, v := range tests {

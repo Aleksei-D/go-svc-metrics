@@ -8,7 +8,19 @@ import (
 	"time"
 )
 
-func GetServerConfig() (*Config, error) {
+const (
+	defaultServerAddr      = "localhost:8080"
+	pollInterval           = 2
+	reportInterval         = 10
+	logLevelDefault        = "INFO"
+	StoreIntervalDefault   = 300
+	FileStoragePathDefault = "metrics.dump"
+	restoreDefault         = false
+	secretKeyDefault       = "SecretKey"
+	defaultRateLimit       = 3
+)
+
+func NewServerConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
@@ -16,11 +28,12 @@ func GetServerConfig() (*Config, error) {
 
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
-	logLevel := serverFlagSet.String("l", logLevelDefault, "log level")
+	logLevel := serverFlagSet.String("w", logLevelDefault, "log level")
 	storeInterval := serverFlagSet.Int("i", StoreIntervalDefault, "store interval")
 	fileStoragePath := serverFlagSet.String("f", FileStoragePathDefault, "file storage path")
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
 	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
+	key := serverFlagSet.String("k", secretKeyDefault, "sha key")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -43,10 +56,13 @@ func GetServerConfig() (*Config, error) {
 	if newConfig.DatabaseDsn == nil {
 		newConfig.DatabaseDsn = databaseDsn
 	}
+	if newConfig.Key == nil {
+		newConfig.Key = key
+	}
 	return newConfig, nil
 }
 
-func GetAgentConfig() (*Config, error) {
+func NewAgentConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
@@ -56,6 +72,8 @@ func GetAgentConfig() (*Config, error) {
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
 	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
 	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
+	key := agentFlagSet.String("k", secretKeyDefault, "sha key")
+	rateLimit := agentFlagSet.Uint("l", defaultRateLimit, "rate limit")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
@@ -68,6 +86,12 @@ func GetAgentConfig() (*Config, error) {
 	}
 	if newConfig.PollInterval == nil {
 		newConfig.PollInterval = pollInterval
+	}
+	if newConfig.Key == nil {
+		newConfig.Key = key
+	}
+	if newConfig.RateLimit == nil {
+		newConfig.RateLimit = rateLimit
 	}
 	return newConfig, nil
 }
@@ -90,6 +114,8 @@ type Config struct {
 	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool   `env:"RESTORE"`
 	DatabaseDsn     *string `env:"DATABASE_DSN"`
+	Key             *string `env:"KEY"`
+	RateLimit       *uint   `env:"RATE_LIMIT"`
 }
 
 func (s Config) GetServeAddress() string {

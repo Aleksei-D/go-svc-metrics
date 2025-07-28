@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	configServe, err := config.GetServerConfig()
+	configServe, err := config.NewServerConfig()
 	if err != nil {
 		logger.Log.Fatal("cannot initialize config")
 	}
@@ -38,7 +38,7 @@ func main() {
 		}
 	}(metricStorage)
 
-	r := chiRouter.GetMetricRouter(metricStorage)
+	r := chiRouter.NewMetricRouter(metricStorage, configServe)
 	server := &http.Server{Addr: configServe.GetServeAddress(), Handler: r}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 

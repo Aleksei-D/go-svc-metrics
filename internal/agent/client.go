@@ -3,10 +3,13 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/utils"
+	"go-svc-metrics/internal/logger"
+	"go-svc-metrics/internal/utils/crypto"
+	"go-svc-metrics/internal/utils/delay"
 	"go-svc-metrics/models"
 	"net/http"
 	"time"
@@ -25,7 +28,7 @@ type retryRoundTripper struct {
 func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	var res *http.Response
 	var err error
-	delay := utils.GetDelay()
+	delay := delay.NewDelay()
 	for attempts := 0; attempts < int(rr.maxRetries); attempts++ {
 		res, err = rr.next.RoundTrip(r)
 		if err == nil && res.StatusCode < http.StatusInternalServerError {
@@ -45,6 +48,18 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
+}
+
+func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan []models.Metrics) {
+	select {
+	case <-doneCh:
+		return
+	case metrics := <-metricCh:
+		err := c.SendBatchMetrics(metrics)
+		if err != nil {
+			logger.Log.Warn(err.Error())
+		}
+	}
 }
 
 func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {
@@ -83,7 +98,7 @@ func (c *ClientAgent) sendMetric(metricData []byte, updatePath string) (*http.Re
 		return nil, err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, updatePath, bytes.NewBuffer(gzipData))
+	request, err := c.getRequest(updatePath, gzipData)
 	if err != nil {
 		return nil, err
 	}
@@ -114,4 +129,22 @@ func Compress(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (c *ClientAgent) getRequest(url string, data []byte) (*http.Request, error) {
+	if c.config.Key != nil {
+		hash := crypto.GetHash(*c.config.Key, data)
+		cryptData, err := crypto.EncryptData(*c.config.Key, data)
+		if err != nil {
+			return nil, err
+		}
+
+		request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(cryptData))
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set("HashSHA256", hex.EncodeToString(hash))
+		return request, nil
+	}
+	return http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 }

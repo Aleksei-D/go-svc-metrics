@@ -1,8 +1,10 @@
-package utils
+package delay
 
-import "time"
+import (
+	"time"
+)
 
-func GetDelay() func() time.Duration {
+func NewDelay() func() time.Duration {
 	attempt := 0
 	delay := 1 * time.Second
 	delayIncrease := 2 * time.Second
