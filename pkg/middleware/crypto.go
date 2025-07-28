@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/utils"
+	"go-svc-metrics/internal/utils/crypto"
 	"io"
 	"net/http"
 )
@@ -27,7 +27,7 @@ func (c *cryptoWriter) Header() http.Header {
 }
 
 func (c *cryptoWriter) Write(p []byte) (int, error) {
-	cryptData, err := utils.EncryptData(c.key, p)
+	cryptData, err := crypto.EncryptData(c.key, p)
 	if err != nil {
 		return 0, err
 	}
@@ -37,7 +37,7 @@ func (c *cryptoWriter) Write(p []byte) (int, error) {
 
 func (c *cryptoWriter) WriteHeader(statusCode int) {
 	if statusCode < 300 {
-		hash := utils.GetHash(c.key, c.body)
+		hash := crypto.GetHash(c.key, c.body)
 		c.w.Header().Set("HashSHA256", hex.EncodeToString(hash))
 	}
 	c.w.WriteHeader(statusCode)
@@ -69,8 +69,8 @@ func (c *CryptoMiddleware) GetCryptoMiddleware(next http.Handler) http.Handler {
 				return
 			}
 
-			newBody, err := utils.DecryptData(*c.Config.Key, bodyBytes)
-			if ok := utils.ValidMAC(newBody, messageMAC, *c.Config.Key); !ok {
+			newBody, err := crypto.DecryptData(*c.Config.Key, bodyBytes)
+			if ok := crypto.ValidMAC(newBody, messageMAC, *c.Config.Key); !ok {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

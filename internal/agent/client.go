@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/logger"
-	"go-svc-metrics/internal/utils"
+	"go-svc-metrics/internal/utils/crypto"
+	"go-svc-metrics/internal/utils/delay"
 	"go-svc-metrics/models"
 	"net/http"
 	"time"
@@ -27,7 +28,7 @@ type retryRoundTripper struct {
 func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	var res *http.Response
 	var err error
-	delay := utils.GetDelay()
+	delay := delay.NewDelay()
 	for attempts := 0; attempts < int(rr.maxRetries); attempts++ {
 		res, err = rr.next.RoundTrip(r)
 		if err == nil && res.StatusCode < http.StatusInternalServerError {
@@ -132,8 +133,8 @@ func Compress(data []byte) ([]byte, error) {
 
 func (c *ClientAgent) getRequest(url string, data []byte) (*http.Request, error) {
 	if c.config.Key != nil {
-		hash := utils.GetHash(*c.config.Key, data)
-		cryptData, err := utils.EncryptData(*c.config.Key, data)
+		hash := crypto.GetHash(*c.config.Key, data)
+		cryptData, err := crypto.EncryptData(*c.config.Key, data)
 		if err != nil {
 			return nil, err
 		}

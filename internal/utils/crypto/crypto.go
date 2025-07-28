@@ -1,26 +1,11 @@
-package utils
+package crypto
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha256"
-	"time"
 )
-
-func GetDelay() func() time.Duration {
-	attempt := 0
-	delay := 1 * time.Second
-	delayIncrease := 2 * time.Second
-	return func() time.Duration {
-		attempt++
-		if attempt == 1 {
-			return delay
-		}
-		delay += delayIncrease
-		return delay
-	}
-}
 
 func GetHash(key string, src []byte) []byte {
 	h := hmac.New(sha256.New, []byte(key))

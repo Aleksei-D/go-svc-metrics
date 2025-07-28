@@ -22,7 +22,7 @@ type MetricUpdater struct {
 }
 
 func NewMetricUpdater() (*MetricUpdater, error) {
-	agentConfig, err := config.GetAgentConfig()
+	agentConfig, err := config.NewAgentConfig()
 	if err != nil {
 		return nil, err
 	}

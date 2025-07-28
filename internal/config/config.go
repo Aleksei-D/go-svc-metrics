@@ -8,7 +8,19 @@ import (
 	"time"
 )
 
-func GetServerConfig() (*Config, error) {
+const (
+	defaultServerAddr      = "localhost:8080"
+	pollInterval           = 2
+	reportInterval         = 10
+	logLevelDefault        = "INFO"
+	StoreIntervalDefault   = 300
+	FileStoragePathDefault = "metrics.dump"
+	restoreDefault         = false
+	secretKeyDefault       = "SecretKey"
+	defaultRateLimit       = 3
+)
+
+func NewServerConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
@@ -50,7 +62,7 @@ func GetServerConfig() (*Config, error) {
 	return newConfig, nil
 }
 
-func GetAgentConfig() (*Config, error) {
+func NewAgentConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err

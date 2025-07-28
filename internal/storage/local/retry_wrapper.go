@@ -3,7 +3,7 @@ package local
 import (
 	"errors"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/utils"
+	"go-svc-metrics/internal/utils/delay"
 	"go-svc-metrics/models"
 	"os"
 	"time"
@@ -30,7 +30,7 @@ func NewRetryWrapperLocalStorage(config *config.Config, attempts uint) (*RetryWr
 
 func (r *RetryWrapperMetricLocalRepository) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
-	delay := utils.GetDelay()
+	delay := delay.NewDelay()
 	for i := 0; i <= int(r.attempts); i++ {
 		upsertMetrics, err := r.MetricLocalRepository.UpdateMetrics(metrics)
 		resultMetrics = append(resultMetrics, upsertMetrics...)
@@ -49,7 +49,7 @@ func (r *RetryWrapperMetricLocalRepository) UpdateMetrics(metrics []models.Metri
 
 func (r *RetryWrapperMetricLocalRepository) GetMetric(metric models.Metrics) (models.Metrics, error) {
 	var resultMetric models.Metrics
-	delay := utils.GetDelay()
+	delay := delay.NewDelay()
 	for i := 0; i <= int(r.attempts); i++ {
 		fetchMetric, err := r.MetricLocalRepository.GetMetric(metric)
 		resultMetric = fetchMetric
@@ -68,7 +68,7 @@ func (r *RetryWrapperMetricLocalRepository) GetMetric(metric models.Metrics) (mo
 
 func (r *RetryWrapperMetricLocalRepository) GetAllMetrics() ([]models.Metrics, error) {
 	var resultMetrics []models.Metrics
-	delay := utils.GetDelay()
+	delay := delay.NewDelay()
 	for i := 0; i <= int(r.attempts); i++ {
 		fetchMetrics, err := r.MetricLocalRepository.GetAllMetrics()
 		resultMetrics = append(resultMetrics, fetchMetrics...)
