@@ -2,8 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/v4/cpu"
-	"github.com/shirou/gopsutil/v4/mem"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/models"
 	"math/rand"
@@ -11,6 +9,9 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 const counterMetricName = "PollCount"
