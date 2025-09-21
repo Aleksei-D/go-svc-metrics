@@ -1,4 +1,4 @@
-package database
+package postgres
 
 import (
 	"context"
@@ -6,29 +6,25 @@ import (
 	"go-svc-metrics/models"
 )
 
-type MetricDatabaseRepository struct {
+type PostgresMetricRepository struct {
 	db *sql.DB
 }
 
-func NewMetricRepository(db *sql.DB) (*MetricDatabaseRepository, error) {
-	_, err := db.Exec(CreateTableSQL)
-	if err != nil {
-		return nil, err
-	}
-	return &MetricDatabaseRepository{db: db}, nil
+func NewMetricRepository(db *sql.DB) *PostgresMetricRepository {
+	return &PostgresMetricRepository{db: db}
 }
 
-func (m *MetricDatabaseRepository) Ping() error {
+func (m *PostgresMetricRepository) Ping() error {
 	return m.db.Ping()
 }
 
-func (m *MetricDatabaseRepository) Close() error { return m.db.Close() }
+func (m *PostgresMetricRepository) Close() error { return m.db.Close() }
 
-func (m *MetricDatabaseRepository) DumpMetricsByInterval(_ context.Context) error {
+func (m *PostgresMetricRepository) DumpMetricsByInterval(_ context.Context) error {
 	return nil
 }
 
-func (m *MetricDatabaseRepository) UpdateMetrics(metrics []models.Metrics) ([]models.Metrics, error) {
+func (m *PostgresMetricRepository) UpdateMetrics(ctx context.Context, metrics []models.Metrics) ([]models.Metrics, error) {
 	tx, err := m.db.Begin()
 	if err != nil {
 		return metrics, err
@@ -44,7 +40,7 @@ func (m *MetricDatabaseRepository) UpdateMetrics(metrics []models.Metrics) ([]mo
 		var delta sql.NullInt64
 		var value sql.NullFloat64
 
-		row := stmt.QueryRow(metric.ID, metric.MType, metric.Delta, metric.Value)
+		row := stmt.QueryRowContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 		err = row.Scan(&delta, &value)
 		if err != nil {
 			return metrics, err
@@ -64,11 +60,11 @@ func (m *MetricDatabaseRepository) UpdateMetrics(metrics []models.Metrics) ([]mo
 	return metrics, nil
 }
 
-func (m *MetricDatabaseRepository) GetMetric(metric models.Metrics) (models.Metrics, error) {
+func (m *PostgresMetricRepository) GetMetric(ctx context.Context, metric models.Metrics) (models.Metrics, error) {
 	var delta sql.NullInt64
 	var value sql.NullFloat64
 	query := `SELECT delta, value FROM metric_table WHERE name_id = $1 and type = $2`
-	row := m.db.QueryRow(query, metric.ID, metric.MType)
+	row := m.db.QueryRowContext(ctx, query, metric.ID, metric.MType)
 	err := row.Scan(&delta, &value)
 	if err != nil {
 		return metric, err
@@ -83,9 +79,9 @@ func (m *MetricDatabaseRepository) GetMetric(metric models.Metrics) (models.Metr
 	return metric, nil
 }
 
-func (m *MetricDatabaseRepository) GetAllMetrics() ([]models.Metrics, error) {
+func (m *PostgresMetricRepository) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
-	rows, err := m.db.Query("SELECT name_id, type, delta, value FROM metric_table")
+	rows, err := m.db.QueryContext(ctx, "SELECT name_id, type, delta, value FROM metric_table")
 	if err != nil {
 		return metrics, err
 	}

@@ -2,13 +2,16 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
-	"github.com/go-chi/chi/v5"
-	"go-svc-metrics/internal/usecase"
+	"errors"
+	"go-svc-metrics/internal/service"
+	errors2 "go-svc-metrics/internal/utils/custom_errors"
 	"go-svc-metrics/models"
 	"io"
 	"net/http"
-	"strconv"
+
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -18,85 +21,50 @@ const (
 )
 
 type MetricHandler struct {
-	MetricUseCase *usecase.MetricUseCase
+	metricService *service.MetricService
+}
+
+func NewMetricHandler(metricService *service.MetricService) *MetricHandler {
+	return &MetricHandler{metricService: metricService}
 }
 
 func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request) {
 	metricType := chi.URLParam(req, MetricTypePath)
 	metricNameFromPath := chi.URLParam(req, MetricNamePath)
 	metricValueFromPath := chi.URLParam(req, MetricValuePath)
-	metric := models.Metrics{
-		ID:    metricNameFromPath,
-		MType: metricType,
-	}
-	switch metricType {
-	case models.Counter:
-		metricValue, err := strconv.Atoi(metricValueFromPath)
-		if err != nil {
-			http.Error(res, "invalid metric value", http.StatusBadRequest)
-			return
-		}
-		value := int64(metricValue)
-		metric.Delta = &value
-		_, err = m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
-		if err != nil {
-			http.Error(res, "invalid counter operation", http.StatusBadRequest)
-			return
-		}
-		res.WriteHeader(http.StatusOK)
-	case models.Gauge:
-		metricValue, err := strconv.ParseFloat(metricValueFromPath, 64)
-		if err != nil {
-			http.Error(res, "invalid metric value", http.StatusBadRequest)
-			return
-		}
-		metric.Value = &metricValue
-		_, err = m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
-		if err != nil {
-			http.Error(res, "invalid gauge operation", http.StatusBadRequest)
-			return
-		}
-		res.WriteHeader(http.StatusOK)
-	default:
-		http.Error(res, "invalid metric type", http.StatusBadRequest)
+	err := m.metricService.UpdateMetric(req.Context(), metricType, metricNameFromPath, metricValueFromPath)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
+	res.WriteHeader(http.StatusOK)
 }
 
 func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Request) {
-	var value string
 	metricTypeFromPath := chi.URLParam(req, MetricTypePath)
 	metricNameFromPath := chi.URLParam(req, MetricNamePath)
-	if metricTypeFromPath != models.Counter && metricTypeFromPath != models.Gauge {
-		http.Error(res, "invalid metric type", http.StatusBadRequest)
-		return
-	}
-
-	metric, err := m.MetricUseCase.GetMetric(models.Metrics{
-		ID:    metricNameFromPath,
-		MType: metricTypeFromPath,
-	})
+	value, err := m.metricService.GetMetricValue(req.Context(), metricTypeFromPath, metricNameFromPath)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusNotFound)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			http.Error(res, err.Error(), http.StatusNotFound)
+		case errors.Is(err, errors2.ErrInvalidMetricVType):
+			http.Error(res, err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
-	switch metric.MType {
-	case models.Counter:
-		value = strconv.Itoa(int(*metric.Delta))
-	case models.Gauge:
-		value = strconv.FormatFloat(*metric.Value, 'f', -1, 64)
-	}
 
-	res.WriteHeader(http.StatusOK)
 	_, err = res.Write([]byte(value))
 	if err != nil {
 		http.Error(res, "invalid value", http.StatusBadRequest)
 		return
 	}
+
+	res.WriteHeader(http.StatusOK)
 }
 
-func (m *MetricHandler) GetMetrics(res http.ResponseWriter, _ *http.Request) {
-	metrics, err := m.MetricUseCase.GetAllMetrics()
+func (m *MetricHandler) GetMetrics(res http.ResponseWriter, req *http.Request) {
+	metrics, err := m.metricService.GetAllMetrics(req.Context())
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
@@ -126,9 +94,9 @@ func (m *MetricHandler) V2UpdateMetric(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	updatedMetrics, err := m.MetricUseCase.UpdateMetrics([]models.Metrics{metric})
+	updatedMetrics, err := m.metricService.UpdateMetrics(req.Context(), []models.Metrics{metric})
 	if err != nil {
-		http.Error(res, "invalid counter operation", http.StatusInternalServerError)
+		http.Error(res, errors2.ErrInvalidCounterOperation.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -157,7 +125,7 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	metric, err := m.MetricUseCase.GetMetric(metricReq)
+	metric, err := m.metricService.GetMetric(req.Context(), metricReq)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusNotFound)
 		return
@@ -187,7 +155,7 @@ func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Re
 		return
 	}
 
-	updatedMetrics, err := m.MetricUseCase.UpdateMetrics(metrics)
+	updatedMetrics, err := m.metricService.UpdateMetrics(req.Context(), metrics)
 	if err != nil {
 		http.Error(res, "invalid counter operation", http.StatusBadRequest)
 		return
@@ -203,8 +171,8 @@ func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Re
 	res.Write(jsonData)
 }
 
-func (m *MetricHandler) GetPing(res http.ResponseWriter, _ *http.Request) {
-	err := m.MetricUseCase.Ping()
+func (m *MetricHandler) GetPing(res http.ResponseWriter, req *http.Request) {
+	err := m.metricService.Ping()
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

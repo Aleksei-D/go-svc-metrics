@@ -1,16 +1,17 @@
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go-svc-metrics/internal/config"
+	"go-svc-metrics/internal/domain/local"
 	"go-svc-metrics/internal/router"
-	"go-svc-metrics/internal/storage/local"
-	"go-svc-metrics/internal/usecase"
+	"go-svc-metrics/internal/service"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testRequest(t *testing.T, ts *httptest.Server, method,
@@ -69,10 +70,10 @@ func TestStatusHandler(t *testing.T) {
 
 	_ = config.InitDefaultEnv()
 	configServe, _ := config.InitConfig()
-	memStorage, _ := local.NewRetryWrapperLocalStorage(configServe, 3)
-	metricUseCase := usecase.NewMetricUseCase(memStorage)
+	memStorage, _ := local.NewMetricLocalRepository(configServe)
+	metricService := service.NewMetricService(memStorage)
 	defer memStorage.Close()
-	ts := httptest.NewServer(router.NewMetricRouter(metricUseCase, configServe))
+	ts := httptest.NewServer(router.NewRouter(metricService, configServe))
 	defer ts.Close()
 
 	for _, v := range tests {

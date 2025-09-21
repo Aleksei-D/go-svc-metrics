@@ -2,10 +2,11 @@ package config
 
 import (
 	"flag"
-	"github.com/caarlos0/env/v6"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/caarlos0/env/v6"
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 	restoreDefault         = false
 	secretKeyDefault       = "SecretKey"
 	defaultRateLimit       = 3
+	waitDefault            = 15
 )
 
 func NewServerConfig() (*Config, error) {
@@ -34,6 +36,7 @@ func NewServerConfig() (*Config, error) {
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
 	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
 	key := serverFlagSet.String("k", secretKeyDefault, "sha key")
+	wait := serverFlagSet.Uint("z", waitDefault, "wait default")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -58,6 +61,9 @@ func NewServerConfig() (*Config, error) {
 	}
 	if newConfig.Key == nil {
 		newConfig.Key = key
+	}
+	if newConfig.Wait == nil {
+		newConfig.Wait = wait
 	}
 	return newConfig, nil
 }
@@ -116,6 +122,7 @@ type Config struct {
 	DatabaseDsn     *string `env:"DATABASE_DSN"`
 	Key             *string `env:"KEY"`
 	RateLimit       *uint   `env:"RATE_LIMIT"`
+	Wait            *uint   `env:"WAIT"`
 }
 
 func (s Config) GetServeAddress() string {

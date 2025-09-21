@@ -40,7 +40,7 @@ func NewMetricLocalRepository(config *config.Config) (*MetricLocalRepository, er
 	return &localStorage, nil
 }
 
-func (m *MetricLocalRepository) UpdateMetrics(metricsToUpdate []models.Metrics) ([]models.Metrics, error) {
+func (m *MetricLocalRepository) UpdateMetrics(_ context.Context, metricsToUpdate []models.Metrics) ([]models.Metrics, error) {
 	for _, metricToUpdate := range metricsToUpdate {
 		m.mutex.Lock()
 		switch metricToUpdate.MType {
@@ -60,7 +60,7 @@ func (m *MetricLocalRepository) UpdateMetrics(metricsToUpdate []models.Metrics) 
 	return metricsToUpdate, nil
 }
 
-func (m *MetricLocalRepository) GetAllMetrics() ([]models.Metrics, error) {
+func (m *MetricLocalRepository) GetAllMetrics(_ context.Context) ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
 	for _, metric := range m.Metrics {
 		metrics = append(metrics, metric)
@@ -68,7 +68,7 @@ func (m *MetricLocalRepository) GetAllMetrics() ([]models.Metrics, error) {
 	return metrics, nil
 }
 
-func (m *MetricLocalRepository) GetMetric(metric models.Metrics) (models.Metrics, error) {
+func (m *MetricLocalRepository) GetMetric(_ context.Context, metric models.Metrics) (models.Metrics, error) {
 	m.mutex.Lock()
 	value, ok := m.Metrics[metric.ID]
 	m.mutex.Unlock()
@@ -79,7 +79,7 @@ func (m *MetricLocalRepository) GetMetric(metric models.Metrics) (models.Metrics
 }
 
 func (m *MetricLocalRepository) Ping() error {
-	return fmt.Errorf("DB not initialized")
+	return fmt.Errorf("is local storage (file)")
 }
 
 func (m *MetricLocalRepository) Close() error {
@@ -116,6 +116,17 @@ func (m *MetricLocalRepository) WriteMetric(metric *models.Metrics) error {
 	return err
 }
 
+func (m *MetricLocalRepository) DumpMetricsByInterval(ctx context.Context) error {
+	storeIntervalTicker := time.NewTicker(m.storeInterval)
+	defer storeIntervalTicker.Stop()
+	select {
+	case <-storeIntervalTicker.C:
+		return m.DumpMetrics()
+	case <-ctx.Done():
+		return m.DumpMetrics()
+	}
+}
+
 func (m *MetricLocalRepository) DumpMetrics() error {
 	metricCopy := make(map[string]models.Metrics)
 	m.mutex.Lock()
@@ -131,15 +142,4 @@ func (m *MetricLocalRepository) DumpMetrics() error {
 		}
 	}
 	return nil
-}
-
-func (m *MetricLocalRepository) DumpMetricsByInterval(ctx context.Context) error {
-	storeIntervalTicker := time.NewTicker(m.storeInterval)
-	defer storeIntervalTicker.Stop()
-	select {
-	case <-storeIntervalTicker.C:
-		return m.DumpMetrics()
-	case <-ctx.Done():
-		return m.DumpMetrics()
-	}
 }

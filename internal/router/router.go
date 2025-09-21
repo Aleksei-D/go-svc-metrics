@@ -1,17 +1,16 @@
 package router
 
 import (
-	"github.com/go-chi/chi/v5"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/handlers"
-	"go-svc-metrics/internal/storage"
-	"go-svc-metrics/internal/usecase"
-	middleware2 "go-svc-metrics/pkg/middleware"
+	middleware2 "go-svc-metrics/internal/middleware"
+	"go-svc-metrics/internal/service"
+
+	"github.com/go-chi/chi/v5"
 )
 
-func NewMetricRouter(metricRepository storage.MetricRepository, config *config.Config) chi.Router {
-	metricUseCase := usecase.NewMetricUseCase(metricRepository)
-	metricHandler := handlers.MetricHandler{MetricUseCase: metricUseCase}
+func NewRouter(metricService *service.MetricService, config *config.Config) chi.Router {
+	metricHandler := handlers.NewMetricHandler(metricService)
 
 	r := chi.NewRouter()
 	cryptoMiddleware := middleware2.CryptoMiddleware{Config: config}
