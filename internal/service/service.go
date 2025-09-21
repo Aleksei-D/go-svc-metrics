@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"go-svc-metrics/internal/domain"
-	errors2 "go-svc-metrics/internal/utils/custom_errors"
+	errors2 "go-svc-metrics/internal/utils/errors"
 	"go-svc-metrics/models"
 	"strconv"
 )

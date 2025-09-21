@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"go-svc-metrics/internal/service"
-	errors2 "go-svc-metrics/internal/utils/custom_errors"
+	errors2 "go-svc-metrics/internal/utils/errors"
 	"go-svc-metrics/models"
 	"io"
 	"net/http"
