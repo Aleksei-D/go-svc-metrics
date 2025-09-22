@@ -16,12 +16,14 @@ import (
 
 const counterMetricName = "PollCount"
 
+// MetricUpdater хранит метрики и конфиг.
 type MetricUpdater struct {
 	clientAgent ClientAgent
 	*config.Config
 	CounterMetric *int64
 }
 
+// NewMetricUpdater создает новый MetricUpdater
 func NewMetricUpdater() (*MetricUpdater, error) {
 	agentConfig, err := config.NewAgentConfig()
 	if err != nil {
@@ -44,6 +46,7 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 	}, nil
 }
 
+// Run запускаетсборщика метрик.
 func (m *MetricUpdater) Run() error {
 	errors := make(chan error)
 	doneCh := make(chan struct{})
@@ -96,6 +99,7 @@ func (m *MetricUpdater) sendMetrics(doneCh chan struct{}, metricCh <-chan []mode
 	}
 }
 
+// GetMetrics получение метрики с машины.
 func (m *MetricUpdater) GetMetrics() ([]models.Metrics, error) {
 	var memStats runtime.MemStats
 	metrics := make([]models.Metrics, 0)

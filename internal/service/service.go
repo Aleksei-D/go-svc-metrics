@@ -1,3 +1,4 @@
+// Модуль service предоставляет сервисный слой для работы сервера
 package service
 
 import (
@@ -8,14 +9,17 @@ import (
 	"strconv"
 )
 
+// MetricService хранит доступ репозиторию
 type MetricService struct {
 	metricRepo domain.MetricRepo
 }
 
+// NewMetricService возвращает MetricService
 func NewMetricService(metricRepo domain.MetricRepo) *MetricService {
 	return &MetricService{metricRepo: metricRepo}
 }
 
+// UpdateMetric обновляет метрику в репозитории и проверяет передаваемые данные.
 func (m *MetricService) UpdateMetric(ctx context.Context, metricType, metricName, metricValue string) error {
 	metric := models.Metrics{
 		ID:    metricName,
@@ -49,14 +53,17 @@ func (m *MetricService) UpdateMetric(ctx context.Context, metricType, metricName
 	return nil
 }
 
+// UpdateMetrics обновляет батч метрик в репозитории.
 func (m *MetricService) UpdateMetrics(ctx context.Context, metrics []models.Metrics) ([]models.Metrics, error) {
 	return m.metricRepo.UpdateMetrics(ctx, metrics)
 }
 
+// GetAllMetrics возращает все метрики из репозитория.
 func (m *MetricService) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
 	return m.metricRepo.GetAllMetrics(ctx)
 }
 
+// GetMetricValue возвращает значение метрики.
 func (m *MetricService) GetMetricValue(ctx context.Context, metricType, metricName string) (string, error) {
 	var value string
 	if metricType != models.Counter && metricType != models.Gauge {
@@ -80,14 +87,17 @@ func (m *MetricService) GetMetric(ctx context.Context, metric models.Metrics) (m
 	return m.metricRepo.GetMetric(ctx, metric)
 }
 
+// Ping проверяет коннкт к БД.
 func (m *MetricService) Ping() error {
 	return m.metricRepo.Ping()
 }
 
+// Close закрывает репозиторий, если это необходимо.
 func (m *MetricService) Close() error {
 	return m.metricRepo.Close()
 }
 
+// DumpMetricsByInterval сохраняет данные в репозиторий.
 func (m *MetricService) DumpMetricsByInterval(ctx context.Context) error {
 	return m.metricRepo.DumpMetricsByInterval(ctx)
 }

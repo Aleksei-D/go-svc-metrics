@@ -1,3 +1,4 @@
+// Модуль router реализует роутеры.
 package router
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// NewRouter возвращает роутеры для сервера.
 func NewRouter(metricService *service.MetricService, config *config.Config) chi.Router {
 	metricHandler := handlers.NewMetricHandler(metricService)
 

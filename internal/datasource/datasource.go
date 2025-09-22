@@ -1,3 +1,4 @@
+// Модуль datasource отвечает за подключение к БД и миграции
 package datasource
 
 import (
@@ -6,6 +7,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// NewDatabase возвращает подключение к БД и накатывает новые миграции.
 func NewDatabase(databaseURI string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", databaseURI)
 	if err != nil {

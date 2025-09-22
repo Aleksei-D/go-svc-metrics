@@ -1,9 +1,11 @@
+// Модуль delay предоставляет задержку.
 package delay
 
 import (
 	"time"
 )
 
+// NewDelay возвращает функцию с замыканием , которая увичивает задержку.
 func NewDelay() func() time.Duration {
 	attempt := 0
 	delay := 1 * time.Second

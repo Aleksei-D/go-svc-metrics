@@ -1,3 +1,4 @@
+// модуль handlers релизуют хендлеры сервера по сбору метрик.
 package handlers
 
 import (
@@ -14,20 +15,29 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Константы для работы с квер строкой.
 const (
 	MetricTypePath  = "metricType"
 	MetricNamePath  = "metricName"
 	MetricValuePath = "metricValue"
 )
 
+// MetricHandler хранит слой сервиса.
 type MetricHandler struct {
 	metricService *service.MetricService
 }
 
+// NewMetricHandler создает и возвращает новый MetricHandler.
 func NewMetricHandler(metricService *service.MetricService) *MetricHandler {
 	return &MetricHandler{metricService: metricService}
 }
 
+// UpdateMetric обработка ендпоинта POST /update/{metricType}/{metricName}/{metricValue}.
+// Записывает в репозиторий метерику из квери.
+//
+// Example:
+//
+//	http://localhost:8080/update/counter/CounterMetric/4
 func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request) {
 	metricType := chi.URLParam(req, MetricTypePath)
 	metricNameFromPath := chi.URLParam(req, MetricNamePath)
@@ -40,6 +50,16 @@ func (m *MetricHandler) UpdateMetric(res http.ResponseWriter, req *http.Request)
 	res.WriteHeader(http.StatusOK)
 }
 
+// GetMetricValue обработка ендпоинта GET /value/{metricType}/{metricName}.
+// Возвращает значение метрики.
+//
+// Example:
+//
+//	http://localhost:8080/value/ounter/CounterMetric
+//
+// Output:
+//
+// 4
 func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Request) {
 	metricTypeFromPath := chi.URLParam(req, MetricTypePath)
 	metricNameFromPath := chi.URLParam(req, MetricNamePath)
@@ -63,6 +83,27 @@ func (m *MetricHandler) GetMetricValue(res http.ResponseWriter, req *http.Reques
 	res.WriteHeader(http.StatusOK)
 }
 
+// GetMetrics обработка ендпоинта GET / .
+// Возвращает значение метрики.
+//
+// Example:
+//
+//	http://localhost:8080/
+//
+// Output:
+//
+//	[
+//	  {
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	  },
+//	  {
+//	    "id": "CounterMetric",
+//	    "type": "counter",
+//	    "delta": "4"
+//	  }
+//	]
 func (m *MetricHandler) GetMetrics(res http.ResponseWriter, req *http.Request) {
 	metrics, err := m.metricService.GetAllMetrics(req.Context())
 	if err != nil {
@@ -80,6 +121,28 @@ func (m *MetricHandler) GetMetrics(res http.ResponseWriter, req *http.Request) {
 	res.Write(jsonString)
 }
 
+// V2UpdateMetric обработка ендпоинта POST /update/ .
+// Возвращает значение метрики.
+//
+// Example:
+//
+//	http://localhost:8080/update/
+//
+// Input:
+//
+//	{
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	}
+//
+// Output:
+//
+//	{
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	}
 func (m *MetricHandler) V2UpdateMetric(res http.ResponseWriter, req *http.Request) {
 	var metric models.Metrics
 
@@ -110,6 +173,27 @@ func (m *MetricHandler) V2UpdateMetric(res http.ResponseWriter, req *http.Reques
 	res.Write(jsonData)
 }
 
+// GetMetric обработка ендпоинта POST /value/ .
+// Возвращает значение метрики.
+//
+// Example:
+//
+//	http://localhost:8080/value/
+//
+// Input:
+//
+//	{
+//	    "id": "GaugeMetric",
+//	    "type": "gauge"
+//	}
+//
+// Output:
+//
+//	{
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	}
 func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 	var metricReq models.Metrics
 	var buf bytes.Buffer
@@ -141,6 +225,42 @@ func (m *MetricHandler) GetMetric(res http.ResponseWriter, req *http.Request) {
 	res.Write(jsonData)
 }
 
+// UpdateBatchMetrics обработка ендпоинта POST /updates/ .
+// Возвращает значение метрики.
+//
+// Example:
+//
+//	http://localhost:8080/updates/
+//
+// Input:
+//
+//	[
+//	  {
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	  },
+//	  {
+//	    "id": "CounterMetric",
+//	    "type": "counter",
+//	    "delta": "4"
+//	  }
+//	]
+//
+// Output:
+//
+//	[
+//	  {
+//	    "id": "GaugeMetric",
+//	    "type": "gauge",
+//	    "value": "1.0"
+//	  },
+//	  {
+//	    "id": "CounterMetric",
+//	    "type": "counter",
+//	    "delta": "4"
+//	  }
+//	]
 func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Request) {
 	var metrics []models.Metrics
 
@@ -171,6 +291,7 @@ func (m *MetricHandler) UpdateBatchMetrics(res http.ResponseWriter, req *http.Re
 	res.Write(jsonData)
 }
 
+// GetPing проверяет подключение к БД.
 func (m *MetricHandler) GetPing(res http.ResponseWriter, req *http.Request) {
 	err := m.metricService.Ping()
 	if err != nil {

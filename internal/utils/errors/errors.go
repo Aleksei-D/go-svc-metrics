@@ -1,7 +1,9 @@
+// модуль errors содержит кастомные ошибки.
 package errors
 
 import "errors"
 
+// Кастосные ошибки
 var (
 	ErrInvalidMetricValue      = errors.New("invalid metric value")
 	ErrInvalidCounterOperation = errors.New("invalid counter operation")

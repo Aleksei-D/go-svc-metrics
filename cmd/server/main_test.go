@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"go-svc-metrics/models"
@@ -32,8 +31,10 @@ const (
 )
 
 var (
-	validCounterINT64 int64   = 4
-	validGaugeFLOAT64 float64 = 1.0
+	validCounterINT64     int64          = 4
+	validGaugeFLOAT64     float64        = 1.0
+	expectedGaugeMetric   models.Metrics = models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64}
+	expectedCounterMetric models.Metrics = models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64}
 )
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
@@ -96,10 +97,6 @@ func TestUpdateHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64}
-
 	mockMetricRepo.EXPECT().UpdateMetrics(gomock.Any(), []models.Metrics{expectedGaugeMetric}).Return([]models.Metrics{expectedGaugeMetric}, nil).AnyTimes()
 	mockMetricRepo.EXPECT().UpdateMetrics(gomock.Any(), []models.Metrics{expectedCounterMetric}).Return([]models.Metrics{expectedCounterMetric}, nil).AnyTimes()
 
@@ -154,13 +151,8 @@ func TestValueHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64}
-
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: validGaugeID, MType: models.Gauge}).Return(expectedGaugeMetric, nil).AnyTimes()
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: validCounterID, MType: models.Counter}).Return(expectedCounterMetric, nil).AnyTimes()
-
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: invalidGaugeID, MType: models.Gauge}).Return(models.Metrics{}, sql.ErrNoRows).AnyTimes()
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: invalidCounterID, MType: models.Counter}).Return(models.Metrics{}, sql.ErrNoRows).AnyTimes()
 
@@ -195,20 +187,7 @@ func TestAllMetricsHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	newValidCounterValue := new(int64)
-	counterValue, _ := strconv.Atoi(validCounter)
-	*newValidCounterValue = int64(counterValue)
-
-	newValidGaugeValue := new(float64)
-	gaugeValue, _ := strconv.ParseFloat(validGauge, 64)
-	*newValidGaugeValue = gaugeValue
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: newValidGaugeValue}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: newValidCounterValue}
-	expectedMetrics := []models.Metrics{expectedGaugeMetric, expectedCounterMetric}
-
-	mockMetricRepo.EXPECT().GetAllMetrics(gomock.Any()).Return(expectedMetrics, nil).AnyTimes()
+	mockMetricRepo.EXPECT().GetAllMetrics(gomock.Any()).Return([]models.Metrics{expectedGaugeMetric, expectedCounterMetric}, nil).AnyTimes()
 
 	_ = config.InitDefaultEnv()
 	configServe, _ := config.InitConfig()
@@ -256,10 +235,6 @@ func TestUpdateModelHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64}
-
 	mockMetricRepo.EXPECT().UpdateMetrics(gomock.Any(), []models.Metrics{expectedGaugeMetric}).Return([]models.Metrics{expectedGaugeMetric}, nil).AnyTimes()
 	mockMetricRepo.EXPECT().UpdateMetrics(gomock.Any(), []models.Metrics{expectedCounterMetric}).Return([]models.Metrics{expectedCounterMetric}, nil).AnyTimes()
 
@@ -271,11 +246,11 @@ func TestUpdateModelHandler(t *testing.T) {
 
 	for _, v := range tests {
 		t.Run(v.name, func(t *testing.T) {
-			userJSON, err := json.Marshal(v.metric)
+			metricJSON, err := json.Marshal(v.metric)
 			require.NoError(t, err)
 
 			path := "/update"
-			resp, _ := testRequest(t, ts, http.MethodPost, path, userJSON)
+			resp, _ := testRequest(t, ts, http.MethodPost, path, metricJSON)
 			defer resp.Body.Close()
 			assert.Equal(t, v.code, resp.StatusCode)
 		})
@@ -325,13 +300,8 @@ func TestGetModelHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64}
-
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: validGaugeID, MType: models.Gauge}).Return(expectedGaugeMetric, nil).AnyTimes()
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: validCounterID, MType: models.Counter}).Return(expectedCounterMetric, nil).AnyTimes()
-
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: invalidGaugeID, MType: models.Gauge}).Return(models.Metrics{}, sql.ErrNoRows).AnyTimes()
 	mockMetricRepo.EXPECT().GetMetric(gomock.Any(), models.Metrics{ID: invalidCounterID, MType: models.Counter}).Return(models.Metrics{}, sql.ErrNoRows).AnyTimes()
 
@@ -343,11 +313,11 @@ func TestGetModelHandler(t *testing.T) {
 
 	for _, v := range tests {
 		t.Run(v.name, func(t *testing.T) {
-			userJSON, err := json.Marshal(v.metric)
+			metricJSON, err := json.Marshal(v.metric)
 			require.NoError(t, err)
 
 			path := "/value"
-			resp, _ := testRequest(t, ts, http.MethodPost, path, userJSON)
+			resp, _ := testRequest(t, ts, http.MethodPost, path, metricJSON)
 			defer resp.Body.Close()
 			assert.Equal(t, v.code, resp.StatusCode)
 		})
@@ -363,8 +333,8 @@ func TestUpdateBatchMetricslHandler(t *testing.T) {
 		{
 			name: "positive test update batch model handler",
 			metrics: []models.Metrics{
-				models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64},
-				models.Metrics{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64},
+				{ID: validGaugeID, MType: models.Gauge, Value: &validGaugeFLOAT64},
+				{ID: validCounterID, MType: models.Counter, Delta: &validCounterINT64},
 			},
 			code: http.StatusOK,
 		},
@@ -373,18 +343,6 @@ func TestUpdateBatchMetricslHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockMetricRepo := mocks.NewMockMetricRepo(ctrl)
-
-	newValidCounterValue := new(int64)
-	counterValue, _ := strconv.Atoi(validCounter)
-	*newValidCounterValue = int64(counterValue)
-
-	newValidGaugeValue := new(float64)
-	gaugeValue, _ := strconv.ParseFloat(validGauge, 64)
-	*newValidGaugeValue = gaugeValue
-
-	expectedGaugeMetric := models.Metrics{ID: validGaugeID, MType: models.Gauge, Value: newValidGaugeValue}
-	expectedCounterMetric := models.Metrics{ID: validCounterID, MType: models.Counter, Delta: newValidCounterValue}
-
 	mockMetricRepo.EXPECT().UpdateMetrics(gomock.Any(), []models.Metrics{expectedGaugeMetric, expectedCounterMetric}).Return([]models.Metrics{expectedGaugeMetric, expectedCounterMetric}, nil).AnyTimes()
 
 	_ = config.InitDefaultEnv()
@@ -395,11 +353,11 @@ func TestUpdateBatchMetricslHandler(t *testing.T) {
 
 	for _, v := range tests {
 		t.Run(v.name, func(t *testing.T) {
-			userJSON, err := json.Marshal(v.metrics)
+			metricJSON, err := json.Marshal(v.metrics)
 			require.NoError(t, err)
 
 			path := "/updates"
-			resp, _ := testRequest(t, ts, http.MethodPost, path, userJSON)
+			resp, _ := testRequest(t, ts, http.MethodPost, path, metricJSON)
 			defer resp.Body.Close()
 			assert.Equal(t, v.code, resp.StatusCode)
 		})
