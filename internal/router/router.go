@@ -14,7 +14,9 @@ import (
 
 // NewRouter возвращает роутеры для сервера.
 func NewRouter(metricService *service.MetricService, config *config.Config) chi.Router {
-	metricHandler := handlers.NewMetricHandler(metricService)
+	updateHandlers := handlers.NewUpdateHandlers(metricService)
+	valueHandlers := handlers.NewValueHandlers(metricService)
+	commonHandlers := handlers.NewCommonHandlers(metricService)
 
 	r := chi.NewRouter()
 	cryptoMiddleware := middleware2.CryptoMiddleware{Config: config}
@@ -22,18 +24,18 @@ func NewRouter(metricService *service.MetricService, config *config.Config) chi.
 	r.Use(middleware2.CompressMiddleware)
 	r.Use(middleware2.LoggingMiddleware)
 
-	r.Get("/", metricHandler.GetMetrics)
-	r.Get("/ping", metricHandler.GetPing)
+	r.Get("/", commonHandlers.GetMetrics)
+	r.Get("/ping", commonHandlers.GetPing)
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/{metricType}/{metricName}/{metricValue}", metricHandler.UpdateMetric)
-		r.Post("/", metricHandler.V2UpdateMetric)
+		r.Post("/{metricType}/{metricName}/{metricValue}", updateHandlers.UpdateMetric)
+		r.Post("/", updateHandlers.V2UpdateMetric)
 	})
 	r.Route("/value", func(r chi.Router) {
-		r.Get("/{metricType}/{metricName}", metricHandler.GetMetricValue)
-		r.Post("/", metricHandler.GetMetric)
+		r.Get("/{metricType}/{metricName}", valueHandlers.GetMetricValue)
+		r.Post("/", valueHandlers.GetMetric)
 	})
 	r.Route("/updates", func(r chi.Router) {
-		r.Post("/", metricHandler.UpdateBatchMetrics)
+		r.Post("/", updateHandlers.UpdateBatchMetrics)
 	})
 
 	r.Route("/debug/pprof", func(r chi.Router) {
