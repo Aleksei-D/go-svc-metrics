@@ -22,6 +22,7 @@ const (
 	waitDefault            = 15
 )
 
+// NewServerConfig возвращает конфиг для сервера.
 func NewServerConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
@@ -68,6 +69,7 @@ func NewServerConfig() (*Config, error) {
 	return newConfig, nil
 }
 
+// NewAgentConfig возвращает конфиг для агента.
 func NewAgentConfig() (*Config, error) {
 	newConfig, err := InitConfig()
 	if err != nil {
@@ -102,6 +104,7 @@ func NewAgentConfig() (*Config, error) {
 	return newConfig, nil
 }
 
+// InitConfig иницилизирует конфиг
 func InitConfig() (*Config, error) {
 	var newConfig Config
 	err := env.Parse(&newConfig)
@@ -111,6 +114,7 @@ func InitConfig() (*Config, error) {
 	return &newConfig, err
 }
 
+// Config хранит конфиг
 type Config struct {
 	ServerAddr      *string `env:"ADDRESS"`
 	ReportInterval  *int    `env:"REPORT_INTERVAL"`

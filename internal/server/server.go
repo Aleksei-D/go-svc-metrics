@@ -19,6 +19,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"go.uber.org/zap"
 )
 

@@ -1,3 +1,4 @@
+// Модуль crypto отвечает за хэширование и шифрование данные.
 package crypto
 
 import (
@@ -7,12 +8,14 @@ import (
 	"crypto/sha256"
 )
 
+// GetHash возврашает хэш
 func GetHash(key string, src []byte) []byte {
 	h := hmac.New(sha256.New, []byte(key))
 	h.Write(src)
 	return h.Sum(nil)
 }
 
+// EncryptData шифрует данные
 func EncryptData(key string, src []byte) ([]byte, error) {
 	cipherText, err := getCipherText(key)
 	if err != nil {
@@ -24,6 +27,7 @@ func EncryptData(key string, src []byte) ([]byte, error) {
 	return dst, nil
 }
 
+// EncryptData разшифровывает данные
 func DecryptData(key string, src []byte) ([]byte, error) {
 	cipherText, err := getCipherText(key)
 	if err != nil {
@@ -52,6 +56,7 @@ func getCipherText(key string) (cipher.AEAD, error) {
 	return aesgcm, nil
 }
 
+// ValidMAC сверяет хэш
 func ValidMAC(message, messageMAC []byte, key string) bool {
 	expectedMAC := GetHash(key, message)
 	return hmac.Equal(messageMAC, expectedMAC)

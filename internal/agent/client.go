@@ -1,3 +1,4 @@
+// Модуль agent отправляет метрики машины на сервер.
 package agent
 
 import (
@@ -45,11 +46,13 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return res, err
 }
 
+// ClientAgent хранит конфиг и хттп клиент.
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
 }
 
+// MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
 func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan []models.Metrics) {
 	select {
 	case <-doneCh:
@@ -62,6 +65,7 @@ func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan [
 	}
 }
 
+// SendOneMetric отправляет одну метрику на сервер.
 func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {
 	metricJSON, err := json.Marshal(metric)
 	if err != nil {
@@ -77,6 +81,7 @@ func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {
 	return nil
 }
 
+// SendBatchMetrics отправляет батч метрик на сервер.
 func (c *ClientAgent) SendBatchMetrics(metrics []models.Metrics) error {
 	metricJSON, err := json.Marshal(metrics)
 	if err != nil {
@@ -117,6 +122,7 @@ func (c *ClientAgent) getUpdateBatchPath() string {
 	return fmt.Sprintf(updatesBatchMetricsPath, c.config.GetServeAddress())
 }
 
+// Compress сжимает данные перед отправкой на сервер.
 func Compress(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
