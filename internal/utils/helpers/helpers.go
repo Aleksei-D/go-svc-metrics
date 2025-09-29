@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
 	"go-svc-metrics/models"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ const (
 	ValidGaugeID       = "GaugeMetric"
 	InvalidGaugeID     = "NotExistGaugeMetric"
 	InvalidCounterID   = "NotExistCounterMetric"
+	notAvaible         = "N/A"
 )
 
 var (
@@ -44,4 +46,19 @@ func TestRequest(t *testing.T, ts *httptest.Server, method, path string, body []
 	require.NoError(t, err)
 
 	return resp, string(respBody)
+}
+
+func PrintBuildVersion(buildVersion, buildDate, buildCommit string) {
+	if buildVersion == "" {
+		buildVersion = notAvaible
+	}
+	if buildDate == "" {
+		buildVersion = notAvaible
+	}
+	if buildCommit == "" {
+		buildVersion = notAvaible
+	}
+	fmt.Printf("Build version: %s", buildVersion)
+	fmt.Printf("Build date: %s", buildDate)
+	fmt.Printf("Build commit: %s", buildCommit)
 }

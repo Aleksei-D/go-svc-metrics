@@ -4,11 +4,15 @@ import (
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/internal/server"
+	"go-svc-metrics/internal/utils/helpers"
 
 	"go.uber.org/zap"
 )
 
+var buildVersion, buildDate, buildCommit string
+
 func main() {
+	helpers.PrintBuildVersion(buildVersion, buildDate, buildCommit)
 	err := logger.Initialize("INFO")
 	if err != nil {
 		logger.Log.Fatal("cannot initialize zap", zap.Error(err))
