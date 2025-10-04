@@ -42,6 +42,15 @@ var quickFixChecks map[string]bool = map[string]bool{
 	"QF1001": true,
 }
 
+type fileInspector struct {
+	pass *analysis.Pass
+}
+
+type funcInsespector struct {
+	pass     *analysis.Pass
+	funcDecl *ast.FuncDecl
+}
+
 // NewCheckers возразает набор для мультичекера
 func NewCheckers() []*analysis.Analyzer {
 	var checks []*analysis.Analyzer
@@ -76,30 +85,58 @@ var OsExitInMainAnalyzer = &analysis.Analyzer{
 }
 
 func runOsExitInMain(pass *analysis.Pass) (interface{}, error) {
-	if pass.Pkg.Name() == "main" {
-		for _, file := range pass.Files {
-			ast.Inspect(file, func(node ast.Node) bool {
-				if funcDecl, ok := node.(*ast.FuncDecl); ok {
-					if funcDecl.Name.Name == "main" {
-						ast.Inspect(funcDecl, func(node ast.Node) bool {
-							if c, ok := node.(*ast.CallExpr); ok {
-								if s, ok := c.Fun.(*ast.SelectorExpr); ok {
-									if s.Sel.Name == "Exit" {
-										if i, ok := s.X.(*ast.Ident); ok {
-											if i.Name == "os" {
-												pass.Reportf(funcDecl.Pos(), "package %s should not contain a 'os.Exit' in main function", pass.Pkg.Name())
-											}
-										}
-									}
-								}
-							}
-							return true
-						})
-					}
-				}
-				return true
-			})
-		}
+	if pass.Pkg.Name() != "main" {
+		return nil, nil
 	}
+	filesProcessing(pass)
 	return nil, nil
+}
+
+func filesProcessing(pass *analysis.Pass) {
+	fileInspector := fileInspector{pass: pass}
+	for _, file := range pass.Files {
+		ast.Inspect(file, fileInspector.run)
+	}
+}
+
+func (f *fileInspector) run(node ast.Node) bool {
+	if funcDecl, ok := node.(*ast.FuncDecl); ok {
+		f.funcInspecting(funcDecl)
+	}
+	return true
+}
+
+func (f *fileInspector) funcInspecting(funcDecl *ast.FuncDecl) {
+	if funcDecl.Name.Name == "main" {
+		return
+	}
+	funcInsespector := funcInsespector{pass: f.pass, funcDecl: funcDecl}
+	ast.Inspect(funcDecl, funcInsespector.run)
+}
+
+func (f *funcInsespector) run(node ast.Node) bool {
+	if c, ok := node.(*ast.CallExpr); ok {
+		f.callExprNodeInsepcting(c)
+	}
+	return true
+}
+
+func (f *funcInsespector) callExprNodeInsepcting(callExpr *ast.CallExpr) {
+	s, ok := callExpr.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+
+	if s.Sel.Name != "Exit" {
+		return
+	}
+
+	i, ok := s.X.(*ast.Ident)
+	if !ok {
+		return
+	}
+
+	if i.Name == "os" {
+		f.pass.Reportf(f.funcDecl.Pos(), "package %s should not contain a 'os.Exit' in main function", f.pass.Pkg.Name())
+	}
 }
