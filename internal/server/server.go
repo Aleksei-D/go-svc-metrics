@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"errors"
 	"go-svc-metrics/internal/config"
@@ -12,6 +13,7 @@ import (
 	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/internal/router"
 	"go-svc-metrics/internal/service"
+	"go-svc-metrics/internal/utils/crypto"
 	"log"
 	"net/http"
 	"os"
@@ -25,8 +27,9 @@ import (
 )
 
 type App struct {
-	db  *sql.DB
-	cfg *config.Config
+	db         *sql.DB
+	cfg        *config.Config
+	privateKey *rsa.PrivateKey
 }
 
 func NewApp(cfg *config.Config) (*App, error) {
@@ -34,9 +37,16 @@ func NewApp(cfg *config.Config) (*App, error) {
 	if err != nil {
 		logger.Log.Warn("not connected db")
 	}
+
+	privatekey, err := crypto.GetPrivateKey(*cfg.CryptoKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &App{
-		db:  db,
-		cfg: cfg,
+		db:         db,
+		cfg:        cfg,
+		privateKey: privatekey,
 	}, nil
 }
 
@@ -55,7 +65,7 @@ func (app *App) Run() error {
 	}
 	serviceApp := service.NewMetricService(metricRepo)
 
-	r := router.NewRouter(serviceApp, app.cfg)
+	r := router.NewRouter(serviceApp, app.cfg, app.privateKey)
 
 	server := &http.Server{Addr: *app.cfg.ServerAddr, Handler: r}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())

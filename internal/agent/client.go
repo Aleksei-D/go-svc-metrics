@@ -4,7 +4,8 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/hex"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
@@ -50,6 +51,7 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
+	publicKey  *rsa.PublicKey
 }
 
 // MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
@@ -138,19 +140,15 @@ func Compress(data []byte) ([]byte, error) {
 }
 
 func (c *ClientAgent) getRequest(url string, data []byte) (*http.Request, error) {
-	if c.config.Key != nil {
-		hash := crypto.GetHash(*c.config.Key, data)
-		cryptData, err := crypto.EncryptData(*c.config.Key, data)
+	if c.publicKey != nil {
+		hash := sha256.New()
+
+		ciphertext, err := crypto.EncryptRSAData(hash, c.publicKey, data)
 		if err != nil {
 			return nil, err
 		}
 
-		request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(cryptData))
-		if err != nil {
-			return nil, err
-		}
-		request.Header.Set("HashSHA256", hex.EncodeToString(hash))
-		return request, nil
+		return http.NewRequest(http.MethodPost, url, bytes.NewBuffer(ciphertext))
 	}
 	return http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 }

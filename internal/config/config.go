@@ -38,6 +38,7 @@ func NewServerConfig() (*Config, error) {
 	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
 	key := serverFlagSet.String("k", secretKeyDefault, "sha key")
 	wait := serverFlagSet.Uint("z", waitDefault, "wait default")
+	cyptoKey := serverFlagSet.String("crypto-key", "", "CRYPTO KEY")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -66,6 +67,9 @@ func NewServerConfig() (*Config, error) {
 	if newConfig.Wait == nil {
 		newConfig.Wait = wait
 	}
+	if newConfig.CryptoKey == nil {
+		newConfig.CryptoKey = cyptoKey
+	}
 	return newConfig, nil
 }
 
@@ -82,6 +86,7 @@ func NewAgentConfig() (*Config, error) {
 	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
 	key := agentFlagSet.String("k", secretKeyDefault, "sha key")
 	rateLimit := agentFlagSet.Uint("l", defaultRateLimit, "rate limit")
+	cyptoKey := agentFlagSet.String("crypto-key", "", "CRYPTO KEY")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		panic(err)
@@ -100,6 +105,9 @@ func NewAgentConfig() (*Config, error) {
 	}
 	if newConfig.RateLimit == nil {
 		newConfig.RateLimit = rateLimit
+	}
+	if newConfig.CryptoKey == nil {
+		newConfig.CryptoKey = cyptoKey
 	}
 	return newConfig, nil
 }
@@ -127,6 +135,7 @@ type Config struct {
 	Key             *string `env:"KEY"`
 	RateLimit       *uint   `env:"RATE_LIMIT"`
 	Wait            *uint   `env:"WAIT"`
+	CryptoKey       *string `env:"CRYPTO_KEY"`
 }
 
 func (s Config) GetServeAddress() string {

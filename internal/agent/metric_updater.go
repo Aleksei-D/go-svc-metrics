@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"go-svc-metrics/internal/config"
+	"go-svc-metrics/internal/utils/crypto"
 	"go-svc-metrics/models"
 	"math/rand"
 	"net/http"
@@ -30,6 +31,11 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 		return nil, err
 	}
 
+	publicKey, err := crypto.GetPublickKey(*agentConfig.CryptoKey)
+	if err != nil {
+		return nil, err
+	}
+
 	agentClient := ClientAgent{
 		config: agentConfig,
 		httpClient: &http.Client{
@@ -38,6 +44,7 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 				next:       http.DefaultTransport,
 			},
 		},
+		publicKey: publicKey,
 	}
 	return &MetricUpdater{
 		clientAgent:   agentClient,
