@@ -1,9 +1,10 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v6"
@@ -11,15 +12,15 @@ import (
 
 const (
 	defaultServerAddr      = "localhost:8080"
-	pollInterval           = 2
-	reportInterval         = 10
+	pollIntervalDefault    = "2s"
+	reportIntervalDefault  = "10s"
 	logLevelDefault        = "INFO"
-	StoreIntervalDefault   = 300
+	StoreIntervalDefault   = "300s"
 	FileStoragePathDefault = "metrics.dump"
 	restoreDefault         = false
 	secretKeyDefault       = "SecretKey"
 	defaultRateLimit       = 3
-	waitDefault            = 15
+	waitDefault            = "15s"
 )
 
 // NewServerConfig возвращает конфиг для сервера.
@@ -32,13 +33,14 @@ func NewServerConfig() (*Config, error) {
 	serverFlagSet := flag.NewFlagSet("Server", flag.ExitOnError)
 	serverAddr := serverFlagSet.String("a", defaultServerAddr, "input endpoint")
 	logLevel := serverFlagSet.String("w", logLevelDefault, "log level")
-	storeInterval := serverFlagSet.Int("i", StoreIntervalDefault, "store interval")
+	storeInterval := serverFlagSet.String("i", StoreIntervalDefault, "store interval")
 	fileStoragePath := serverFlagSet.String("f", FileStoragePathDefault, "file storage path")
 	restore := serverFlagSet.Bool("r", restoreDefault, "log level")
 	databaseDsn := serverFlagSet.String("d", "", "Database DSN")
 	key := serverFlagSet.String("k", secretKeyDefault, "sha key")
-	wait := serverFlagSet.Uint("z", waitDefault, "wait default")
+	wait := serverFlagSet.String("z", waitDefault, "wait default")
 	cyptoKey := serverFlagSet.String("crypto-key", "", "CRYPTO KEY")
+	configFilePath := serverFlagSet.String("c", "", "config file")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -50,7 +52,11 @@ func NewServerConfig() (*Config, error) {
 		newConfig.LogLevel = logLevel
 	}
 	if newConfig.StoreInterval == nil {
-		newConfig.StoreInterval = storeInterval
+		storeIntervalDuration, err := time.ParseDuration(*storeInterval)
+		if err != nil {
+			return newConfig, err
+		}
+		newConfig.StoreInterval = &timeConfig{Duration: storeIntervalDuration}
 	}
 	if newConfig.FileStoragePath == nil {
 		newConfig.FileStoragePath = fileStoragePath
@@ -65,10 +71,24 @@ func NewServerConfig() (*Config, error) {
 		newConfig.Key = key
 	}
 	if newConfig.Wait == nil {
-		newConfig.Wait = wait
+		waitDuration, err := time.ParseDuration(*wait)
+		if err != nil {
+			return newConfig, err
+		}
+		newConfig.Wait = &timeConfig{Duration: waitDuration}
 	}
 	if newConfig.CryptoKey == nil {
 		newConfig.CryptoKey = cyptoKey
+	}
+	if newConfig.ConfigFilePath == nil {
+		newConfig.ConfigFilePath = configFilePath
+	}
+
+	if *newConfig.ConfigFilePath != "" {
+		err = newConfig.UpdateFromConfig()
+		if err != nil {
+			return newConfig, err
+		}
 	}
 	return newConfig, nil
 }
@@ -82,23 +102,32 @@ func NewAgentConfig() (*Config, error) {
 
 	agentFlagSet := flag.NewFlagSet("Agent", flag.ExitOnError)
 	serverAddr := agentFlagSet.String("a", defaultServerAddr, "input endpoint")
-	reportInterval := agentFlagSet.Int("r", reportInterval, "input reportInterval")
-	pollInterval := agentFlagSet.Int("p", pollInterval, "input pollInterval")
+	reportInterval := agentFlagSet.String("r", reportIntervalDefault, "input reportInterval")
+	pollInterval := agentFlagSet.String("p", pollIntervalDefault, "input pollInterval")
 	key := agentFlagSet.String("k", secretKeyDefault, "sha key")
 	rateLimit := agentFlagSet.Uint("l", defaultRateLimit, "rate limit")
 	cyptoKey := agentFlagSet.String("crypto-key", "", "CRYPTO KEY")
+	configFilePath := agentFlagSet.String("c", "", "config file")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
-		panic(err)
+		return newConfig, err
 	}
 	if newConfig.ServerAddr == nil {
 		newConfig.ServerAddr = serverAddr
 	}
 	if newConfig.ReportInterval == nil {
-		newConfig.ReportInterval = reportInterval
+		reportIntervalDuration, err := time.ParseDuration(*reportInterval)
+		if err != nil {
+			return newConfig, err
+		}
+		newConfig.ReportInterval = &timeConfig{Duration: reportIntervalDuration}
 	}
 	if newConfig.PollInterval == nil {
-		newConfig.PollInterval = pollInterval
+		pollIntervalDuration, err := time.ParseDuration(*pollInterval)
+		if err != nil {
+			return newConfig, err
+		}
+		newConfig.PollInterval = &timeConfig{Duration: pollIntervalDuration}
 	}
 	if newConfig.Key == nil {
 		newConfig.Key = key
@@ -109,6 +138,17 @@ func NewAgentConfig() (*Config, error) {
 	if newConfig.CryptoKey == nil {
 		newConfig.CryptoKey = cyptoKey
 	}
+	if newConfig.ConfigFilePath == nil {
+		newConfig.ConfigFilePath = configFilePath
+	}
+
+	if *newConfig.ConfigFilePath != "" {
+		err = newConfig.UpdateFromConfig()
+		if err != nil {
+			return newConfig, err
+		}
+	}
+
 	return newConfig, nil
 }
 
@@ -124,41 +164,61 @@ func InitConfig() (*Config, error) {
 
 // Config хранит конфиг
 type Config struct {
-	ServerAddr      *string `env:"ADDRESS"`
-	ReportInterval  *int    `env:"REPORT_INTERVAL"`
-	PollInterval    *int    `env:"POLL_INTERVAL"`
-	LogLevel        *string `env:"LOG_LEVEL"`
-	StoreInterval   *int    `env:"STORE_INTERVAL"`
-	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
-	Restore         *bool   `env:"RESTORE"`
-	DatabaseDsn     *string `env:"DATABASE_DSN"`
-	Key             *string `env:"KEY"`
-	RateLimit       *uint   `env:"RATE_LIMIT"`
-	Wait            *uint   `env:"WAIT"`
-	CryptoKey       *string `env:"CRYPTO_KEY"`
+	ServerAddr      *string     `env:"ADDRESS" json:"address"`
+	ReportInterval  *timeConfig `env:"REPORT_INTERVAL" json:"report_interval"`
+	PollInterval    *timeConfig `env:"POLL_INTERVAL" json:"poll_interval"`
+	LogLevel        *string     `env:"LOG_LEVEL"`
+	StoreInterval   *timeConfig `env:"STORE_INTERVAL" json:"store_interval"`
+	FileStoragePath *string     `env:"FILE_STORAGE_PATH" json:"store_file"`
+	Restore         *bool       `env:"RESTORE" json:"restore"`
+	DatabaseDsn     *string     `env:"DATABASE_DSN" json:"database_dsn"`
+	Key             *string     `env:"KEY"`
+	RateLimit       *uint       `env:"RATE_LIMIT"`
+	Wait            *timeConfig `env:"WAIT"`
+	CryptoKey       *string     `env:"CRYPTO_KEY" json:"crypto_key"`
+	ConfigFilePath  *string     `env:"CONFIG"`
 }
 
-func (s Config) GetServeAddress() string {
-	return *s.ServerAddr
+type timeConfig struct {
+	time.Duration
 }
 
-func (s Config) GetPollInterval() time.Duration {
-	return time.Duration(*s.PollInterval) * time.Second
+func (c Config) GetServeAddress() string {
+	return *c.ServerAddr
 }
 
-func (s Config) GetReportInterval() time.Duration {
-	return time.Duration(*s.ReportInterval) * time.Second
+func (c *Config) UpdateFromConfig() error {
+	fileBytes, err := os.ReadFile(*c.ConfigFilePath)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(fileBytes, &c)
 }
 
-func (s Config) GetStoreInterval() time.Duration {
-	return time.Duration(*s.StoreInterval) * time.Second
+func (t *timeConfig) UnmarshalJSON(b []byte) error {
+	return t.parseDuration(b)
+}
+
+func (t *timeConfig) UnmarshalText(text []byte) error {
+	return t.parseDuration(text)
+}
+
+func (t *timeConfig) parseDuration(data []byte) error {
+	s := strings.Trim(string(data), "\"")
+	duration, err := time.ParseDuration(string(s))
+	if err != nil {
+		return err
+	}
+	t.Duration = duration
+	return nil
 }
 
 func InitDefaultEnv() error {
 	envDefaults := map[string]string{
 		"ADDRESS":           defaultServerAddr,
 		"LOG_LEVEL":         logLevelDefault,
-		"STORE_INTERVAL":    strconv.Itoa(StoreIntervalDefault),
+		"STORE_INTERVAL":    StoreIntervalDefault,
 		"FILE_STORAGE_PATH": FileStoragePathDefault,
 		"RESTORE":           "false",
 	}

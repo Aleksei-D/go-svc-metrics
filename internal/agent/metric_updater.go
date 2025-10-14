@@ -58,10 +58,10 @@ func (m *MetricUpdater) Run() error {
 	errors := make(chan error)
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	pollTicker := time.NewTicker(m.GetPollInterval())
+	pollTicker := time.NewTicker(m.PollInterval.Duration)
 	defer pollTicker.Stop()
 
-	reportTicker := time.NewTicker(m.GetReportInterval())
+	reportTicker := time.NewTicker(m.ReportInterval.Duration)
 	defer reportTicker.Stop()
 
 	metricsCh := m.metricGenerator(doneCh, errors, pollTicker)
@@ -72,7 +72,7 @@ func (m *MetricUpdater) Run() error {
 }
 
 func (m *MetricUpdater) metricGenerator(doneCh chan struct{}, errorCh chan<- error, pollTicker *time.Ticker) <-chan []models.Metrics {
-	metricSizeCh := *m.ReportInterval / *m.PollInterval + 1
+	metricSizeCh := m.ReportInterval.Duration/m.PollInterval.Duration + 1
 	metricCh := make(chan []models.Metrics, metricSizeCh)
 
 	go func() {

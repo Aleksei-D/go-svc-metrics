@@ -19,7 +19,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	_ "net/http/pprof"
 
@@ -76,7 +75,7 @@ func (app *App) Run() error {
 	go func() {
 		<-sig
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(serverCtx, time.Duration(*app.cfg.Wait)*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(serverCtx, app.cfg.Wait.Duration)
 		defer shutdownCancel()
 		defer serviceApp.Close()
 
