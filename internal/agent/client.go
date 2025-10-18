@@ -55,16 +55,13 @@ type ClientAgent struct {
 }
 
 // MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
-func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan []models.Metrics) {
-	select {
-	case <-doneCh:
-		return
-	case metrics := <-metricCh:
-		err := c.SendBatchMetrics(metrics)
-		if err != nil {
-			logger.Log.Warn(err.Error())
-		}
+func (c *ClientAgent) MetricSenderWorker(metricCh <-chan []models.Metrics) {
+	metrics := <-metricCh
+	err := c.SendBatchMetrics(metrics)
+	if err != nil {
+		logger.Log.Warn(err.Error())
 	}
+
 }
 
 // SendOneMetric отправляет одну метрику на сервер.

@@ -14,15 +14,11 @@ import (
 	"go-svc-metrics/internal/router"
 	"go-svc-metrics/internal/service"
 	"go-svc-metrics/internal/utils/crypto"
-	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 
 	_ "net/http/pprof"
-
-	"go.uber.org/zap"
 )
 
 type App struct {
@@ -67,41 +63,25 @@ func (app *App) Run() error {
 	r := router.NewRouter(serviceApp, app.cfg, app.privateKey)
 
 	server := &http.Server{Addr: *app.cfg.ServerAddr, Handler: r}
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	serverCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
-		<-sig
-
-		shutdownCtx, shutdownCancel := context.WithTimeout(serverCtx, app.cfg.Wait.Duration)
-		defer shutdownCancel()
-		defer serviceApp.Close()
-
-		go serviceApp.DumpMetricsByInterval(shutdownCtx)
-
-		go func() {
-			<-shutdownCtx.Done()
-			if errors.Is(shutdownCtx.Err(), context.DeadlineExceeded) {
-				log.Fatal("graceful shutdown timed out.. forcing exit.")
-			}
-		}()
-
-		err := server.Shutdown(shutdownCtx)
-		if err != nil {
-			log.Fatal(err)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Log.Fatal(err.Error())
 		}
-
-		serverStopCtx()
 	}()
 
-	err := server.ListenAndServe()
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Log.Fatal("cannot start server", zap.Error(err))
-		return err
+	<-serverCtx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), app.cfg.Wait.Duration)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Log.Fatal(err.Error())
 	}
 
-	<-serverCtx.Done()
+	serviceApp.DumpMetricsByInterval(shutdownCtx)
 	return nil
 }

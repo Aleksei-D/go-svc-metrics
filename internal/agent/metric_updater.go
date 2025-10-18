@@ -1,14 +1,17 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/utils/crypto"
 	"go-svc-metrics/models"
 	"math/rand"
 	"net/http"
+	"os/signal"
 	"runtime"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -53,25 +56,27 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 	}, nil
 }
 
-// Run запускаетсборщика метрик.
+// Run запускает сборщика метрик.
 func (m *MetricUpdater) Run() error {
 	errors := make(chan error)
-	doneCh := make(chan struct{})
-	defer close(doneCh)
+	agentCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+	defer close(errors)
+
 	pollTicker := time.NewTicker(m.PollInterval.Duration)
 	defer pollTicker.Stop()
 
 	reportTicker := time.NewTicker(m.ReportInterval.Duration)
 	defer reportTicker.Stop()
 
-	metricsCh := m.metricGenerator(doneCh, errors, pollTicker)
-	go m.sendMetrics(doneCh, metricsCh, reportTicker)
+	metricsCh := m.metricGenerator(agentCtx, errors, pollTicker)
+	go m.sendMetrics(agentCtx, metricsCh, reportTicker)
 
 	err := <-errors
 	return err
 }
 
-func (m *MetricUpdater) metricGenerator(doneCh chan struct{}, errorCh chan<- error, pollTicker *time.Ticker) <-chan []models.Metrics {
+func (m *MetricUpdater) metricGenerator(ctx context.Context, errorCh chan<- error, pollTicker *time.Ticker) <-chan []models.Metrics {
 	metricSizeCh := m.ReportInterval.Duration/m.PollInterval.Duration + 1
 	metricCh := make(chan []models.Metrics, metricSizeCh)
 
@@ -79,7 +84,7 @@ func (m *MetricUpdater) metricGenerator(doneCh chan struct{}, errorCh chan<- err
 		defer close(metricCh)
 		for {
 			select {
-			case <-doneCh:
+			case <-ctx.Done():
 				return
 			case <-pollTicker.C:
 				metrics, err := m.GetMetrics()
@@ -93,16 +98,21 @@ func (m *MetricUpdater) metricGenerator(doneCh chan struct{}, errorCh chan<- err
 	return metricCh
 }
 
-func (m *MetricUpdater) sendMetrics(doneCh chan struct{}, metricCh <-chan []models.Metrics, reportTicker *time.Ticker) {
+func (m *MetricUpdater) sendMetrics(ctx context.Context, metricCh <-chan []models.Metrics, reportTicker *time.Ticker) {
 	for {
 		select {
-		case <-doneCh:
+		case <-ctx.Done():
+			m.sendAllMetric(metricCh)
 			return
 		case <-reportTicker.C:
-			for w := 1; w <= int(*m.RateLimit); w++ {
-				go m.clientAgent.MetricSenderWorker(doneCh, metricCh)
-			}
+			m.sendAllMetric(metricCh)
 		}
+	}
+}
+
+func (m *MetricUpdater) sendAllMetric(metricCh <-chan []models.Metrics) {
+	for w := 1; w <= int(*m.RateLimit); w++ {
+		go m.clientAgent.MetricSenderWorker(metricCh)
 	}
 }
 
