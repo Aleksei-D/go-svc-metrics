@@ -63,6 +63,8 @@ func (m *MetricUpdater) Run() error {
 	defer stop()
 	defer close(errors)
 
+	waitMetricsSended := make(chan struct{})
+
 	pollTicker := time.NewTicker(m.PollInterval.Duration)
 	defer pollTicker.Stop()
 
@@ -70,10 +72,14 @@ func (m *MetricUpdater) Run() error {
 	defer reportTicker.Stop()
 
 	metricsCh := m.metricGenerator(agentCtx, errors, pollTicker)
-	go m.sendMetrics(agentCtx, metricsCh, reportTicker)
+	go m.sendMetrics(agentCtx, metricsCh, reportTicker, waitMetricsSended)
 
-	err := <-errors
-	return err
+	select {
+	case err := <-errors:
+		return err
+	case <-waitMetricsSended:
+		return nil
+	}
 }
 
 func (m *MetricUpdater) metricGenerator(ctx context.Context, errorCh chan<- error, pollTicker *time.Ticker) <-chan []models.Metrics {
@@ -98,21 +104,22 @@ func (m *MetricUpdater) metricGenerator(ctx context.Context, errorCh chan<- erro
 	return metricCh
 }
 
-func (m *MetricUpdater) sendMetrics(ctx context.Context, metricCh <-chan []models.Metrics, reportTicker *time.Ticker) {
+func (m *MetricUpdater) sendMetrics(ctx context.Context, metricCh <-chan []models.Metrics, reportTicker *time.Ticker, waitMetricsSended chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
-			m.sendAllMetric(metricCh)
+			m.sendAllMetric(ctx, metricCh)
+			close(waitMetricsSended)
 			return
 		case <-reportTicker.C:
-			m.sendAllMetric(metricCh)
+			m.sendAllMetric(ctx, metricCh)
 		}
 	}
 }
 
-func (m *MetricUpdater) sendAllMetric(metricCh <-chan []models.Metrics) {
+func (m *MetricUpdater) sendAllMetric(ctx context.Context, metricCh <-chan []models.Metrics) {
 	for w := 1; w <= int(*m.RateLimit); w++ {
-		go m.clientAgent.MetricSenderWorker(metricCh)
+		go m.clientAgent.MetricSenderWorker(ctx, metricCh)
 	}
 }
 
