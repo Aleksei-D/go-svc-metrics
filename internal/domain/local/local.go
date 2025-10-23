@@ -30,7 +30,7 @@ func NewMetricLocalRepository(config *config.Config) (*MetricLocalRepository, er
 		Metrics:       make(map[string]models.Metrics),
 		file:          file,
 		scanner:       bufio.NewScanner(file),
-		storeInterval: config.GetStoreInterval(),
+		storeInterval: config.StoreInterval.Duration,
 	}
 	if *config.Restore {
 		err = localStorage.RestoreMetrics()

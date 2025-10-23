@@ -4,7 +4,9 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/hex"
+	"context"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
@@ -50,29 +52,27 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
+	publicKey  *rsa.PublicKey
 }
 
 // MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
-func (c *ClientAgent) MetricSenderWorker(doneCh chan struct{}, metricCh <-chan []models.Metrics) {
-	select {
-	case <-doneCh:
-		return
-	case metrics := <-metricCh:
-		err := c.SendBatchMetrics(metrics)
-		if err != nil {
-			logger.Log.Warn(err.Error())
-		}
+func (c *ClientAgent) MetricSenderWorker(ctx context.Context, metricCh <-chan []models.Metrics) {
+	metrics := <-metricCh
+	err := c.SendBatchMetrics(ctx, metrics)
+	if err != nil {
+		logger.Log.Warn(err.Error())
 	}
+
 }
 
 // SendOneMetric отправляет одну метрику на сервер.
-func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {
+func (c *ClientAgent) SendOneMetric(ctx context.Context, metric models.Metrics) error {
 	metricJSON, err := json.Marshal(metric)
 	if err != nil {
 		return err
 	}
 
-	response, err := c.sendMetric(metricJSON, c.getUpdatePath())
+	response, err := c.sendMetric(ctx, metricJSON, c.getUpdatePath())
 	if err != nil {
 		return err
 	}
@@ -82,13 +82,13 @@ func (c *ClientAgent) SendOneMetric(metric models.Metrics) error {
 }
 
 // SendBatchMetrics отправляет батч метрик на сервер.
-func (c *ClientAgent) SendBatchMetrics(metrics []models.Metrics) error {
+func (c *ClientAgent) SendBatchMetrics(ctx context.Context, metrics []models.Metrics) error {
 	metricJSON, err := json.Marshal(metrics)
 	if err != nil {
 		return err
 	}
 
-	response, err := c.sendMetric(metricJSON, c.getUpdateBatchPath())
+	response, err := c.sendMetric(ctx, metricJSON, c.getUpdateBatchPath())
 	if err != nil {
 		return err
 	}
@@ -97,13 +97,13 @@ func (c *ClientAgent) SendBatchMetrics(metrics []models.Metrics) error {
 	return nil
 }
 
-func (c *ClientAgent) sendMetric(metricData []byte, updatePath string) (*http.Response, error) {
+func (c *ClientAgent) sendMetric(ctx context.Context, metricData []byte, updatePath string) (*http.Response, error) {
 	gzipData, err := Compress(metricData)
 	if err != nil {
 		return nil, err
 	}
 
-	request, err := c.getRequest(updatePath, gzipData)
+	request, err := c.getRequest(ctx, updatePath, gzipData)
 	if err != nil {
 		return nil, err
 	}
@@ -137,20 +137,16 @@ func Compress(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *ClientAgent) getRequest(url string, data []byte) (*http.Request, error) {
-	if c.config.Key != nil {
-		hash := crypto.GetHash(*c.config.Key, data)
-		cryptData, err := crypto.EncryptData(*c.config.Key, data)
+func (c *ClientAgent) getRequest(ctx context.Context, url string, data []byte) (*http.Request, error) {
+	if c.publicKey != nil {
+		hash := sha256.New()
+
+		ciphertext, err := crypto.EncryptRSAData(hash, c.publicKey, data)
 		if err != nil {
 			return nil, err
 		}
 
-		request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(cryptData))
-		if err != nil {
-			return nil, err
-		}
-		request.Header.Set("HashSHA256", hex.EncodeToString(hash))
-		return request, nil
+		return http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(ciphertext))
 	}
-	return http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
+	return http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
 }
