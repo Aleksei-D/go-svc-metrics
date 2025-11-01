@@ -21,6 +21,8 @@ const (
 	secretKeyDefault       = "SecretKey"
 	defaultRateLimit       = 3
 	waitDefault            = "15s"
+	realIPDefault          = "192.168.1.22"
+	trustSubnetDefault     = "192.168.1.0/24"
 )
 
 // NewServerConfig возвращает конфиг для сервера.
@@ -41,6 +43,7 @@ func NewServerConfig() (*Config, error) {
 	wait := serverFlagSet.String("z", waitDefault, "wait default")
 	cyptoKey := serverFlagSet.String("crypto-key", "", "CRYPTO KEY")
 	configFilePath := serverFlagSet.String("c", "", "config file")
+	trustSubnet := serverFlagSet.String("t", trustSubnetDefault, "trust Subnet")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -83,6 +86,9 @@ func NewServerConfig() (*Config, error) {
 	if newConfig.ConfigFilePath == nil {
 		newConfig.ConfigFilePath = configFilePath
 	}
+	if newConfig.TrustedSubnet == nil {
+		newConfig.TrustedSubnet = trustSubnet
+	}
 
 	if *newConfig.ConfigFilePath != "" {
 		err = newConfig.UpdateFromConfig()
@@ -108,6 +114,7 @@ func NewAgentConfig() (*Config, error) {
 	rateLimit := agentFlagSet.Uint("l", defaultRateLimit, "rate limit")
 	cyptoKey := agentFlagSet.String("crypto-key", "", "CRYPTO KEY")
 	configFilePath := agentFlagSet.String("c", "", "config file")
+	realIP := agentFlagSet.String("x", realIPDefault, "real ip")
 	err = agentFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return newConfig, err
@@ -140,6 +147,9 @@ func NewAgentConfig() (*Config, error) {
 	}
 	if newConfig.ConfigFilePath == nil {
 		newConfig.ConfigFilePath = configFilePath
+	}
+	if newConfig.RealIP == nil {
+		newConfig.RealIP = realIP
 	}
 
 	if *newConfig.ConfigFilePath != "" {
@@ -177,6 +187,8 @@ type Config struct {
 	Wait            *timeConfig `env:"WAIT"`
 	CryptoKey       *string     `env:"CRYPTO_KEY" json:"crypto_key"`
 	ConfigFilePath  *string     `env:"CONFIG"`
+	TrustedSubnet   *string     `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	RealIP          *string     `env:"REAL_IP"`
 }
 
 type timeConfig struct {

@@ -34,7 +34,7 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 		return nil, err
 	}
 
-	publicKey, err := crypto.GetPublickKey(*agentConfig.CryptoKey)
+	cert, err := crypto.GetCertificate(*agentConfig.CryptoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 				next:       http.DefaultTransport,
 			},
 		},
-		publicKey: publicKey,
+		cert: cert,
 	}
 	return &MetricUpdater{
 		clientAgent:   agentClient,

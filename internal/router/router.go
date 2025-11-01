@@ -14,12 +14,18 @@ import (
 )
 
 // NewRouter возвращает роутеры для сервера.
-func NewRouter(metricService *service.MetricService, config *config.Config, privateKey *rsa.PrivateKey) chi.Router {
+func NewRouter(metricService *service.MetricService, config *config.Config, privateKey *rsa.PrivateKey) (chi.Router, error) {
 	updateHandlers := handlers.NewUpdateHandlers(metricService)
 	valueHandlers := handlers.NewValueHandlers(metricService)
 	commonHandlers := handlers.NewCommonHandlers(metricService)
 
+	realIPMiddleware, err := middleware2.NewRealIPMiddleware(*config.TrustedSubnet)
+	if err != nil {
+		return nil, err
+	}
+
 	r := chi.NewRouter()
+	r.Use(realIPMiddleware.GetRealIPMiddleware)
 	r.Get("/", commonHandlers.GetMetrics)
 	r.Get("/ping", commonHandlers.GetPing)
 	r.Route("/update", func(r chi.Router) {
@@ -49,5 +55,5 @@ func NewRouter(metricService *service.MetricService, config *config.Config, priv
 		r.Get("/trace", pprof.Trace)
 		r.Get("/{cmd}", pprof.Index)
 	})
-	return r
+	return r, nil
 }
