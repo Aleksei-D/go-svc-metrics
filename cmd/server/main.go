@@ -47,7 +47,10 @@ func main() {
 
 	serviceApp := service.NewMetricService(repo)
 
-	r := router.NewRouter(serviceApp, configServe, app.PrivateKey)
+	r, err := router.NewRouter(serviceApp, configServe, app.PrivateKey)
+	if err != nil {
+		logger.Log.Fatal("cannot init middleware", zap.Error(err))
+	}
 
 	server := &http.Server{Addr: *configServe.ServerAddr, Handler: r}
 
