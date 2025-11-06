@@ -10,9 +10,8 @@ service Metrcic {
     rpc V1GetAll(google.protobuf.Empty) returns (BatchMetricsMessage);
     rpc V1Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc V1UpdateMetric(MetricMessage) returns (MetricMessage);
-    rpc V1UpdatemManyMetrics(BatchMetricsMessage) returns (BatchMetricsMessage);
+    rpc V1UpdateManyMetrics(BatchMetricsMessage) returns (BatchMetricsMessage);
     rpc V1GetMetric(MetricMessage) returns (MetricMessage);
-    rpc V1GetManyMetric(BatchMetricsMessage) returns (BatchMetricsMessage);
 }
 
 
