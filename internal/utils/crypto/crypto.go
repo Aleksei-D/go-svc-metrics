@@ -85,27 +85,23 @@ func GetPrivateKey(filePath string) (*rsa.PrivateKey, error) {
 }
 
 // GetPublickKey получает Публичный ключ из файла
-func GetPublickKey(filePath string) (*rsa.PublicKey, error) {
+func GetCertificate(filePath string) (*x509.Certificate, error) {
 	publicKeyPEM, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading private key file: %v", err)
 	}
 
 	block, _ := pem.Decode(publicKeyPEM)
-	if block == nil || block.Type != "RSA PUBLIC KEY" {
+	if block == nil || block.Type != "CERTIFICATE" {
 		return nil, fmt.Errorf("failed to decode PEM block or block is not an RSA PUBLIC KEY")
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public key: %v", err)
 	}
 
-	rrsaPubKey, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("public key is not an RSA public key")
-	}
-	return rrsaPubKey, nil
+	return cert, nil
 }
 
 // DecryptRSAData разшифровывает данные c помлщью rsa
@@ -134,8 +130,9 @@ func DecryptRSAData(privateKey *rsa.PrivateKey, ciphertext []byte) ([]byte, erro
 }
 
 // EncryptRSAData зашифровывает данные c помлщью rsa
-func EncryptRSAData(hash hash.Hash, publicKey *rsa.PublicKey, data []byte) ([]byte, error) {
+func EncryptRSAData(hash hash.Hash, cert *x509.Certificate, data []byte) ([]byte, error) {
 	msgLen := len(data)
+	publicKey := cert.PublicKey.(*rsa.PublicKey)
 	step := publicKey.Size() - 2*hash.Size() - 2
 	var encryptedBytes []byte
 

@@ -1,16 +1,14 @@
-// Модуль agent отправляет метрики машины на сервер.
-package agent
+package client
 
 import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/internal/utils/crypto"
 	"go-svc-metrics/internal/utils/delay"
 	"go-svc-metrics/models"
@@ -48,20 +46,32 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return res, err
 }
 
-// ClientAgent хранит конфиг и хттп клиент.
+// ClientAgent хранит конфиг и  клиент.
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
-	publicKey  *rsa.PublicKey
+	cert       *x509.Certificate
 }
 
-// MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
-func (c *ClientAgent) MetricSenderWorker(ctx context.Context, metricCh <-chan []models.Metrics) {
-	metrics := <-metricCh
-	err := c.SendBatchMetrics(ctx, metrics)
+func NewClientAgent(agentConfig *config.Config) (*ClientAgent, error) {
+	cert, err := crypto.GetCertificate(*agentConfig.CryptoKey)
 	if err != nil {
-		logger.Log.Warn(err.Error())
+		return nil, err
 	}
+
+	return &ClientAgent{
+		config: agentConfig,
+		httpClient: &http.Client{
+			Transport: &retryRoundTripper{
+				maxRetries: 3,
+				next:       http.DefaultTransport,
+			},
+		},
+		cert: cert,
+	}, nil
+}
+
+func (c *ClientAgent) ConnClose() {
 
 }
 
@@ -111,6 +121,7 @@ func (c *ClientAgent) sendMetric(ctx context.Context, metricData []byte, updateP
 	request.Header.Set("Accept", "text/html")
 	request.Header.Set("Content-Encoding", "gzip")
 	request.Header.Set("Accept-Encoding", "gzip")
+	request.Header.Set("X-Real-IP", *c.config.RealIP)
 	return c.httpClient.Do(request)
 }
 
@@ -138,10 +149,10 @@ func Compress(data []byte) ([]byte, error) {
 }
 
 func (c *ClientAgent) getRequest(ctx context.Context, url string, data []byte) (*http.Request, error) {
-	if c.publicKey != nil {
+	if c.cert != nil {
 		hash := sha256.New()
 
-		ciphertext, err := crypto.EncryptRSAData(hash, c.publicKey, data)
+		ciphertext, err := crypto.EncryptRSAData(hash, c.cert, data)
 		if err != nil {
 			return nil, err
 		}

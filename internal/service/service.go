@@ -54,12 +54,12 @@ func (m *MetricService) UpdateMetric(ctx context.Context, metricType, metricName
 }
 
 // UpdateMetrics обновляет батч метрик в репозитории.
-func (m *MetricService) UpdateMetrics(ctx context.Context, metrics []models.Metrics) ([]models.Metrics, error) {
+func (m *MetricService) UpdateMetrics(ctx context.Context, metrics models.BatchMetrics) (models.BatchMetrics, error) {
 	return m.metricRepo.UpdateMetrics(ctx, metrics)
 }
 
 // GetAllMetrics возращает все метрики из репозитория.
-func (m *MetricService) GetAllMetrics(ctx context.Context) ([]models.Metrics, error) {
+func (m *MetricService) GetAllMetrics(ctx context.Context) (models.BatchMetrics, error) {
 	return m.metricRepo.GetAllMetrics(ctx)
 }
 
