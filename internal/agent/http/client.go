@@ -1,5 +1,4 @@
-// Модуль agent отправляет метрики машины на сервер.
-package agent
+package client
 
 import (
 	"bytes"
@@ -10,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/internal/utils/crypto"
 	"go-svc-metrics/internal/utils/delay"
 	"go-svc-metrics/models"
@@ -48,20 +46,32 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return res, err
 }
 
-// ClientAgent хранит конфиг и хттп клиент.
+// ClientAgent хранит конфиг и  клиент.
 type ClientAgent struct {
 	httpClient *http.Client
 	config     *config.Config
 	cert       *x509.Certificate
 }
 
-// MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
-func (c *ClientAgent) MetricSenderWorker(ctx context.Context, metricCh <-chan []models.Metrics) {
-	metrics := <-metricCh
-	err := c.SendBatchMetrics(ctx, metrics)
+func NewClientAgent(agentConfig *config.Config) (*ClientAgent, error) {
+	cert, err := crypto.GetCertificate(*agentConfig.CryptoKey)
 	if err != nil {
-		logger.Log.Warn(err.Error())
+		return nil, err
 	}
+
+	return &ClientAgent{
+		config: agentConfig,
+		httpClient: &http.Client{
+			Transport: &retryRoundTripper{
+				maxRetries: 3,
+				next:       http.DefaultTransport,
+			},
+		},
+		cert: cert,
+	}, nil
+}
+
+func (c *ClientAgent) ConnClose() {
 
 }
 

@@ -9,15 +9,8 @@ type RealIPMiddleware struct {
 	network *net.IPNet
 }
 
-func NewRealIPMiddleware(trustSubnet string) (RealIPMiddleware, error) {
-	realIPMiddleware := RealIPMiddleware{}
-	_, network, err := net.ParseCIDR(trustSubnet)
-	if err != nil {
-		return realIPMiddleware, err
-	}
-	realIPMiddleware.network = network
-
-	return RealIPMiddleware{network: network}, nil
+func NewRealIPMiddleware(network *net.IPNet) RealIPMiddleware {
+	return RealIPMiddleware{network: network}
 }
 
 func (m *RealIPMiddleware) GetRealIPMiddleware(next http.Handler) http.Handler {
@@ -26,9 +19,9 @@ func (m *RealIPMiddleware) GetRealIPMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		}
 
-		ipStr := r.Header.Get("X-Real-IP")
-		if ipStr != "" {
-			ip := net.ParseIP(ipStr)
+		ipSTR := r.Header.Get("X-Real-IP")
+		if ipSTR != "" {
+			ip := net.ParseIP(ipSTR)
 			if ip == nil {
 				w.WriteHeader(http.StatusUnauthorized)
 				return

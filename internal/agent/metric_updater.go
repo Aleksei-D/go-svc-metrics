@@ -1,13 +1,15 @@
 package agent
 
+// Модуль client отправляет метрики машины на сервер.
+
 import (
 	"context"
 	"fmt"
+	grpc_client "go-svc-metrics/internal/agent/grpc"
 	"go-svc-metrics/internal/config"
-	"go-svc-metrics/internal/utils/crypto"
+	"go-svc-metrics/internal/logger"
 	"go-svc-metrics/models"
 	"math/rand"
-	"net/http"
 	"os/signal"
 	"runtime"
 	"sync/atomic"
@@ -20,9 +22,14 @@ import (
 
 const counterMetricName = "PollCount"
 
+type MetricSender interface {
+	SendBatchMetrics(ctx context.Context, metrics []models.Metrics) error
+	ConnClose()
+}
+
 // MetricUpdater хранит метрики и конфиг.
 type MetricUpdater struct {
-	clientAgent ClientAgent
+	clientAgent MetricSender
 	*config.Config
 	CounterMetric *int64
 }
@@ -34,23 +41,13 @@ func NewMetricUpdater() (*MetricUpdater, error) {
 		return nil, err
 	}
 
-	cert, err := crypto.GetCertificate(*agentConfig.CryptoKey)
+	clientAgent, err := grpc_client.NewClientAgent(agentConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	agentClient := ClientAgent{
-		config: agentConfig,
-		httpClient: &http.Client{
-			Transport: &retryRoundTripper{
-				maxRetries: 3,
-				next:       http.DefaultTransport,
-			},
-		},
-		cert: cert,
-	}
 	return &MetricUpdater{
-		clientAgent:   agentClient,
+		clientAgent:   clientAgent,
 		Config:        agentConfig,
 		CounterMetric: new(int64),
 	}, nil
@@ -62,6 +59,7 @@ func (m *MetricUpdater) Run() error {
 	agentCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 	defer close(errors)
+	defer m.clientAgent.ConnClose()
 
 	waitMetricsSended := make(chan struct{})
 
@@ -119,8 +117,18 @@ func (m *MetricUpdater) sendMetrics(ctx context.Context, metricCh <-chan []model
 
 func (m *MetricUpdater) sendAllMetric(ctx context.Context, metricCh <-chan []models.Metrics) {
 	for w := 1; w <= int(*m.RateLimit); w++ {
-		go m.clientAgent.MetricSenderWorker(ctx, metricCh)
+		go m.MetricSenderWorker(ctx, metricCh)
 	}
+}
+
+// MetricSenderWorker полуает батч метрик и отправляет батчами на сервер метрики.
+func (m *MetricUpdater) MetricSenderWorker(ctx context.Context, metricCh <-chan []models.Metrics) {
+	metrics := <-metricCh
+	err := m.clientAgent.SendBatchMetrics(ctx, metrics)
+	if err != nil {
+		logger.Log.Warn(err.Error())
+	}
+
 }
 
 // GetMetrics получение метрики с машины.
