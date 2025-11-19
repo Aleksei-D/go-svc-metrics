@@ -6,8 +6,8 @@ import (
 	"go-svc-metrics/internal/config"
 	"go-svc-metrics/internal/domain"
 	"go-svc-metrics/internal/logger"
-	"go-svc-metrics/internal/router"
-	"go-svc-metrics/internal/server"
+	grpc_server "go-svc-metrics/internal/server/grpc"
+	http_server "go-svc-metrics/internal/server/http"
 	"go-svc-metrics/internal/service"
 	"go-svc-metrics/internal/utils/helpers"
 	"net/http"
@@ -21,6 +21,8 @@ var buildVersion, buildDate, buildCommit string
 
 func main() {
 	helpers.PrintBuildVersion(buildVersion, buildDate, buildCommit)
+	var serverGRPC *grpc_server.App
+
 	err := logger.Initialize("INFO")
 	if err != nil {
 		logger.Log.Fatal("cannot initialize zap", zap.Error(err))
@@ -31,15 +33,6 @@ func main() {
 		logger.Log.Fatal("cannot initialize config", zap.Error(err))
 	}
 
-	app, err := server.NewApp(configServe)
-	if err != nil {
-		logger.Log.Fatal("cannot initialize server", zap.Error(err))
-	}
-
-	if err != nil {
-		logger.Log.Fatal("cannot start server", zap.Error(err))
-	}
-
 	repo, err := domain.NewRepo(configServe)
 	if err != nil {
 		logger.Log.Fatal("cannot init repo", zap.Error(err))
@@ -47,26 +40,47 @@ func main() {
 
 	serviceApp := service.NewMetricService(repo)
 
-	r := router.NewRouter(serviceApp, configServe, app.PrivateKey)
+	serverHTTP, err := http_server.NewApp(configServe, serviceApp)
+	if err != nil {
+		logger.Log.Fatal("cannot initialize server", zap.Error(err))
+	}
 
-	server := &http.Server{Addr: *configServe.ServerAddr, Handler: r}
+	if configServe.AddrGRPC != nil {
+		app, err := grpc_server.NewApp(serviceApp, configServe)
+		if err != nil {
+			logger.Log.Fatal(err.Error())
+		}
+		serverGRPC = app
+	}
 
 	serverCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := serverHTTP.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Log.Fatal(err.Error())
 		}
 	}()
+
+	if serverGRPC != nil {
+		go func() {
+			if err := serverGRPC.Run(); err != nil {
+				logger.Log.Fatal("can not start grpc server", zap.Error(err))
+			}
+		}()
+	}
 
 	<-serverCtx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), configServe.Wait.Duration)
 	defer cancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := serverHTTP.Stop(shutdownCtx); err != nil {
 		logger.Log.Fatal(err.Error())
+	}
+
+	if serverGRPC != nil {
+		serverGRPC.Stop()
 	}
 
 	serviceApp.DumpMetricsByInterval(shutdownCtx)

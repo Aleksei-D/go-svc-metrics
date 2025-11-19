@@ -21,7 +21,8 @@ func NewTestServer(repo domain.MetricRepo) *httptest.Server {
 	_ = config.InitDefaultEnv()
 	configServe, _ := config.InitConfig()
 	metricService := service.NewMetricService(repo)
-	return httptest.NewServer(router.NewRouter(metricService, configServe, nil))
+	r, _ := router.NewRouter(metricService, configServe)
+	return httptest.NewServer(r)
 }
 
 func TestAllMetricsHandler(t *testing.T) {

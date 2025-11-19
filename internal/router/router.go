@@ -7,6 +7,8 @@ import (
 	"go-svc-metrics/internal/handlers"
 	middleware2 "go-svc-metrics/internal/middleware"
 	"go-svc-metrics/internal/service"
+	"go-svc-metrics/internal/utils/crypto"
+	"net"
 
 	"net/http/pprof"
 
@@ -14,12 +16,34 @@ import (
 )
 
 // NewRouter возвращает роутеры для сервера.
-func NewRouter(metricService *service.MetricService, config *config.Config, privateKey *rsa.PrivateKey) chi.Router {
+func NewRouter(metricService *service.MetricService, config *config.Config) (chi.Router, error) {
+	var privateKey *rsa.PrivateKey
+
 	updateHandlers := handlers.NewUpdateHandlers(metricService)
 	valueHandlers := handlers.NewValueHandlers(metricService)
 	commonHandlers := handlers.NewCommonHandlers(metricService)
 
+	if config.CryptoKey != nil {
+		pKey, err := crypto.GetPrivateKey(*config.CryptoKey)
+		if err != nil {
+			return nil, err
+		}
+
+		privateKey = pKey
+	}
+
 	r := chi.NewRouter()
+
+	if config.TrustedSubnet != nil {
+		_, network, err := net.ParseCIDR(*config.TrustedSubnet)
+		if err != nil {
+			return nil, err
+		}
+
+		realIPMiddleware := middleware2.NewRealIPMiddleware(network)
+		r.Use(realIPMiddleware.GetRealIPMiddleware)
+	}
+
 	r.Get("/", commonHandlers.GetMetrics)
 	r.Get("/ping", commonHandlers.GetPing)
 	r.Route("/update", func(r chi.Router) {
@@ -49,5 +73,5 @@ func NewRouter(metricService *service.MetricService, config *config.Config, priv
 		r.Get("/trace", pprof.Trace)
 		r.Get("/{cmd}", pprof.Index)
 	})
-	return r
+	return r, nil
 }
